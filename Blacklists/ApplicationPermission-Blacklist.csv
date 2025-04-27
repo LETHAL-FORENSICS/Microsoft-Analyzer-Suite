@@ -1,5 +1,6 @@
 "Permission","PermissionType","DisplayText","AdminConsentRequired","Severity"
 "AdministrativeUnit.ReadWrite.All","Application","Read and write all administrative units","Yes","High"
+"ADSynchronization.ReadWrite.All","Application","Enables attackers to call the undocumented Microsoft Entra AD Synchronization Service API, allowing them to modify hybrid user accounts and reset their passwords.","Yes","High"
 "Application.ReadWrite.All","Application","Read and write all applications","Yes","High"
 "AppRoleAssignment.ReadWrite.All","Application","Manage app permission grants and app role assignments","Yes","High"
 "Calendars.Read","Application","Read calendars in all mailboxes","Yes","High"

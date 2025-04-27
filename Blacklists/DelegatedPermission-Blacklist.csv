@@ -1,5 +1,6 @@
 "Permission","PermissionType","DisplayText","AdminConsentRequired","Severity"
 "AdministrativeUnit.ReadWrite.All","Delegated","Read and write administrative units","Yes","High"
+"ADSynchronization.ReadWrite.All","Delegated","Enables attackers to call the undocumented Microsoft Entra AD Synchronization Service API, allowing them to modify hybrid user accounts and reset their passwords.","Yes","High"
 "AllSites.FullControl","Delegated","Have full control of all site collections","Yes","High"
 "AllSites.Manage","Delegated","Read and write items and lists in all site collections","No","High"
 "AllSites.Read","Delegated","Read items in all site collections","No","High"
