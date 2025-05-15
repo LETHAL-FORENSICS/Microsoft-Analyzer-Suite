@@ -105,7 +105,7 @@ Write-Output ""
 # Generate Self-Signed Certificate
 Write-Output "[Info]  Generating Self-Signed Certificate for Microsoft Graph API ..."
 Write-Output "[Info]  CaseNumber: $FriendlyName"
-$CertName = "Invictus_IR-App"
+$CertName = "Lethal-Forensics_IR-App"
 $NotAfter = (Get-Date).AddMonths(1) # Expires in one month
 $Cert = New-SelfSignedCertificate -Subject "CN=$CertName" -FriendlyName "$FriendlyName" -CertStoreLocation "Cert:\CurrentUser\My" -KeyExportPolicy Exportable -KeySpec Signature -KeyLength 2048 -KeyAlgorithm RSA -HashAlgorithm SHA256 -NotAfter $NotAfter
 

@@ -78,3 +78,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 [M365_Oauth_Apps - Repository of suspicious Enterprise Applications (BEC)](https://github.com/randomaccess3/detections/blob/main/M365_Oauth_Apps/MaliciousOauthAppDetections.json)  
 [RogueApps by Huntress Labs](https://huntresslabs.github.io/rogueapps/)  
 [Microsoft First Party App Name Lookup](https://github.com/merill/microsoft-info/)  
+[Tenable - Dangerous Delegated Permissions Affecting the Tenant](https://www.tenable.com/indicators/ioe/entra/DANGEROUS-DELEGATED-PERMISSIONS-AFFECTING-THE-TENANT)  
+[Tenable - Dangerous Application Permissions Affecting the Tenant](https://www.tenable.com/indicators/ioe/entra/DANGEROUS-APPLICATION-PERMISSIONS-AFFECTING-THE-TENANT)  
