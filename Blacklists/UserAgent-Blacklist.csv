@@ -5,6 +5,7 @@
 "azurehound","Offensive Tool","Red"
 "AzurePowershell/","Offensive Tool","Yellow"
 "BAV2ROPC","Password Spraying Attack","Red"
+"curl/","Cryptojacking Attack","Red"
 "fasthttp","Password Spraying Attack","Red"
 "Go-http-client/","Password Spraying Attack, AiTM","Red"
 "go-resty/","Password Spraying Attack, AiTM","Red"
