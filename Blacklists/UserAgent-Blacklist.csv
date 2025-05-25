@@ -2,6 +2,7 @@
 "AADInternals","Offensive Tool","Red"
 "agentaxios","Password Spraying Attack,AiTM","Red"
 "axios/","Password Spraying Attack,AiTM","Red"
+"AZURECLI/","Cryptojacking","Yellow"
 "azurehound","Offensive Tool","Red"
 "AzurePowershell/","Offensive Tool","Yellow"
 "BAV2ROPC","Password Spraying Attack","Red"
@@ -17,3 +18,4 @@
 "PowerShell/7","Offensive Tool","Yellow"
 "python-requests","Offensive Tool","Yellow"
 "python/","Offensive Tool","Yellow"
+"Python/","Offensive Tool","Yellow"
