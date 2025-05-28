@@ -44,6 +44,7 @@
 "Mail.ReadWrite.Shared","Delegated","Read and write user and shared mail","No","High"
 "Mail.Send","Delegated","Send mail as a user","No","High"
 "Mail.Send.Shared","Delegated","Send mail on behalf of others","No","High"
+"MailboxItem.ImportExport","Delegated","Allows the app to perform backup and restore of mailbox items","Yes","High"
 "MailboxSettings.Read","Delegated","Read user mailbox settings","No","High"
 "MailboxSettings.ReadWrite","Delegated","Read and write user mailbox settings","No","High"
 "Member.Read.Hidden","Delegated","Read hidden memberships","Yes","High"
