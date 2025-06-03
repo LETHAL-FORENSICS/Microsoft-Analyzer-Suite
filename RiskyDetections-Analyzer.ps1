@@ -87,6 +87,18 @@ Param(
 
 # Declarations
 
+# Script Root
+if ($PSVersionTable.PSVersion.Major -gt 2)
+{
+    # PowerShell 3+
+    $SCRIPT_DIR = $PSScriptRoot
+}
+else
+{
+    # PowerShell 2
+    $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Definition
+}
+
 # Output Directory
 if (!($OutputDir))
 {
@@ -351,9 +363,9 @@ ForEach($Record in $Data)
 
     $Line = [PSCustomObject]@{
     "Activity"                    = $Record.Activity # Indicates the activity type the detected risk is linked to.
-    "ActivityDateTime"            = ($Record | Select-Object @{Name="ActivityDateTime";Expression={([DateTime]::ParseExact($_.ActivityDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}}).ActivityDateTime # Date and time that the risky activity occurred (UTC). 
-    "DetectedDateTime"            = ($Record | Select-Object @{Name="DetectedDateTime";Expression={([DateTime]::ParseExact($_.DetectedDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}}).DetectedDateTime # Date and time that the risk was detected.
-    "LastUpdatedDateTime"         = ($Record | Select-Object @{Name="LastUpdatedDateTime";Expression={([DateTime]::ParseExact($_.LastUpdatedDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}}).LastUpdatedDateTime # Date and time that the risk detection was last updated.
+    "ActivityDateTime"            = (Get-Date $Record.ActivityDateTime).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+    "DetectedDateTime"            = (Get-Date $Record.DetectedDateTime).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+    "LastUpdatedDateTime"         = (Get-Date $Record.LastUpdatedDateTime).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
     "UserPrincipalName"           = $Record.UserPrincipalName # The user principal name (UPN) of the user.
     "UserDisplayName"             = $Record.UserDisplayName # The user principal name (UPN) of the user.
     "UserId"                      = $Record.UserId # Unique ID of the user.
@@ -928,8 +940,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUnrHtPotACn5d2dwA7AEdh98s
-# WVeggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUWq6FGwNVttmKmfvriInOyt7B
+# SdiggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -1131,33 +1143,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBT7i91ZZkHByo+4RxEzd8Ql+JRYejANBgkqhkiG9w0B
-# AQEFAASCAgCOVo8S8Pd/THbHgLiNd8MPZicE+BSSCksvCMscumNhem7JnlukFBQ8
-# tUBpxPU80Ycse5UifE8osC8QWPdNsNifiVa86bTLcbvM7OMj5yEW+6LKXspnze/n
-# CUZ6omUDJT5iTgKd019akyFwSshiksE+22kWQ6jG+guGb2u7SClM2MgfnUZQChjZ
-# TM/8ZSBfqJS8Yo7JMToavllVfQJJ8w/yFy7XVgywhAw4RWmTZy1t/sQL4TwZ5K2g
-# ImXha4umgSBvwdTiW6i+Ww/1gqbjk0/6pGB+F4zvB2Ixx32v6leMgvnrYnSOgukR
-# x1cyOiQIv3EXUMfCKj/DF8klGT7wjRzQ382UwlljbKHBX5MALoez0Num5cPPbfmG
-# y8Tu3/RNDrXrjpvYhNmNPzu7SZ5AZkzvMqe/EQicR3/+uzYjW7lrQo65AtXaPIfj
-# rCvEZq1njrdW3t38janlGl0D/tV8PxJLnz0Kry4NqEBFX83V8ttln6Bd9oBmmdm6
-# 9yNmz9PE//1XebW/5i9MscKM1jil4rYACkGvNshJ35Y83M8Pv9Sth4ZWyNFP/Dng
-# wleCRt6O9vQV9IBuSWQKFb92kjT6g0u2O4Wk7Yl//pe96n163WkzNO5E4Z+GxMB7
-# nZ1Wi8Dwy2X6bkCrgeN7ir6yEhewZzhWl9vAtmJ20e7EP/g4Vyv+PqGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBSDEdXm8rLoqnrU0X9lKxCWd0kKojANBgkqhkiG9w0B
+# AQEFAASCAgBIIXT2Fo8gNT4kDWratl6EguZauAlLzie/DtomYtgUwzyAviPOx10o
+# JSd2zAIvXnmt27GLjaPgzO6wBzGp89vTrnkRg2GzO27h0JPuE/j65P9KYXpJSMFk
+# KgDBY+vteDBfyKYs041z5GFwff6RvUJ1Nc1BeJbdSRKlryfLQ23yhlRJ+LCjIyuq
+# S0HM+Q79D1jk+g7gigbv5axxdUocVJsKHEjv3uJh3a7z3osqmg4gCDXU90FAvWj4
+# XOE0Wg//Gg6RckNY4hgMPNobrRJ+RY4oXO3ZnU0dpfnFusuKUtZQDtbfJElw1ACj
+# LFtX83APxS9untZPdVE3ArcTombbj6DKci1DjguKhdOyqY1PIlLOiOmvxiPz1ijv
+# dlta66NO0NuSRAWjoqmyKzrTE5PfcTwGocy4SyOELQuJaXGHNXz3iv6OhdjDEKLg
+# OS4CgTVlAhXsPmYsVijPD3PlVsREThZyhKhcrMc2N2GJDXbcQh67BYHly1gJlAbK
+# 6/1uuGljbCOZzt4UInmzBmsR1Rsq86N3rgETqBvZaow+sT7w0CzjTwZsNGFKpImo
+# 7Y8N15qIOyhAfMbtp4BT1cVvBhBs40D8wy6UWf5luETmkBeYTT6ZEJjhYc3batgf
+# elchrZbOcHvv+DxLGGxTY1T497I55+bVdT2rm3/JAu7V1XQE1+BcfKGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDU1OFowPwYJKoZIhvcNAQkEMTIEMKiyjbw0+SOYVjljTK9FT1iiwdZd
-# hYNLZ0CUo/vTuDlFW4spzA+bAaoSqyJyjrGtSzANBgkqhkiG9w0BAQEFAASCAgBN
-# Z8MURVhV5kjNJvXWStsKPFIwmRcg+Nf6k4V+F9ZJ/192ZV91feFWzTUGBHVcgiGr
-# EvRaTmEM4akEOY9VB/H4cSpoDGDSlr7yJxAT6l1XxLL/+b8TBvHjq3U3wlY/nlYf
-# cyFvTVurD2dsc6hT3h25g4p/GIRzRBW5bdCW7NdhzIz24msxa/J/8nn4fn7WYZ03
-# KmFzFEEXtUQLph0mVVRvqDgEjA4nnXrTzssFYu38qF9W+zkD8SBaDCdmxtvSc9zN
-# hSd3rTp/V8/JPNQdBZJuCMfZag6OzBQ9yqMZaQGpZcPg4RC1BwQRS0aXHp+g2HDU
-# +tFWVuk3S8mwt99CHcxya/q9HLt02eqb9j7rgILwPlTc0McQD/+mO1ybPfMFMTv2
-# vInHWnI7RKJLeKOn9MO0z96wrVPno3AVvtRGsn5QbejnFmZ1Bja112N9z/cZfo5Q
-# 0a/TRcxTxX6Lmu/1vxOKoDCmpaMqUnGMGS+2dbaCKWAHpUxGkynW5dWW5wUOWBuc
-# 5B+U0gkFRA64UlD4bfcwyp0YJlHIkmG0/EIZrse0q2JFBE6zEfP6SzqVauyfx68S
-# UA6/wbT46IS6vEY8hJwINcw3RULhzLzMbJnVl5iHsQpRkDGbS7rs58FN0eJYwP3N
-# EL1PYodzZW2nVheAIqeSZnhQlvnWEFBuPuYe2KFL+w==
+# MDYwMzA5MzAyM1owPwYJKoZIhvcNAQkEMTIEMJsGTgTremYI7G1DrW4cvaw4VPFl
+# Rz0OgZ018EFgl459qG4JsMROXw6NCrsegT25AjANBgkqhkiG9w0BAQEFAASCAgA8
+# lJ3093i4odqjyM5g/fMVEQDMdKZYBl9vSt17a7/Q1EbKKRKmFT90IluIz8q7pADJ
+# 7Y8QPDfdp6Ghrs/5z7tKE7S60bko8sgEJgWcMueZv/+5VFPms3L7BKyF4w7GcU+X
+# qH/9L0PZgdCiqHGNiKADlhcLgIbo28layMtLIOQzvKuyZPNa5kyN3f9Nf1QefTNi
+# UdhYItGTnkMCt87yOYdExWz8DLrECLN2B1rnmLIPBxaEbYaogtFGXtk2XFlMwphx
+# cLZj7EfcnDZhab++9fZ9VBOHHAyTzaQbGvdt3LGVOxM7+8Mu+fiZL9fpYTU5dqxq
+# dCf04H9OdrrUqFBJN2mewG/14NT68KvtV004QaU58rIv8+vydG5U5zvRUjIwqDIL
+# cul6ce+o5LPJ/pr10sJCuAs95U+XCJTDMJTEWbybjQwd7ISScjriDd1ft2I6sX4T
+# 6UMXG/CeYVrrHVDp+t+O2RnA8QOvLdkEoiTHPwEr+VSCouWZB9dSuUjmHQyPOwC6
+# odXpvmctc6Tifsq0lIX5l0g7Xt/F4lilYZymbiymKqvmtPJP7uDjtT7lTef79jka
+# uvOBEtWYzAWYzGyEu7i5gGtG7yXd1FWE0ojUMQybibDSe4J7B2ogDIbBqssxFMiz
+# KmHrKTmM0yKhkWfs6RPatDM2Q8dMgBjsvNS2AzWi2Q==
 # SIG # End signature block
