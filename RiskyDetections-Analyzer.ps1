@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-05-15
+# @date:      2025-06-03
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -20,9 +20,13 @@
 # ImportExcel v7.8.10 (2024-10-21)
 # https://github.com/dfinke/ImportExcel
 #
+# IPinfo CLI 3.3.1 (2024-03-01)
+# https://ipinfo.io/signup?ref=cli --> Sign up for free
+# https://github.com/ipinfo/cli
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 5.1 (5.1.19041.5737)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 7.5.1
+#
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
 #
 #
 #############################################################################################################################################################################################
@@ -35,7 +39,7 @@
 .DESCRIPTION
   RiskyDetections-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of the Risk Detections from the Entra ID Identity Protection extracted via "Microsoft-Extractor-Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.3)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieves-the-risky-detections
 
@@ -101,6 +105,11 @@ else
     }
 }
 
+# Tools
+
+# IPinfo CLI
+$script:IPinfo = "$SCRIPT_DIR\Tools\IPinfo\ipinfo.exe"
+
 #endregion Declarations
 
 #############################################################################################################################################################################################
@@ -126,6 +135,11 @@ if (!(Get-Module -ListAvailable -Name ImportExcel))
 # Windows Title
 $DefaultWindowsTitle = $Host.UI.RawUI.WindowTitle
 $Host.UI.RawUI.WindowTitle = "RiskyDetections-Analyzer - Automated Processing of 'RiskyDetections.csv' (Microsoft-Extractor-Suite by Invictus-IR)"
+
+# Colors
+Add-Type -AssemblyName System.Drawing
+$script:Orange = [System.Drawing.Color]::FromArgb(255,192,0) # Orange
+$script:Green  = [System.Drawing.Color]::FromArgb(0,176,80) # Green
 
 # Flush Output Directory
 if (Test-Path "$OUTPUT_FOLDER")
@@ -210,6 +224,48 @@ $AnalysisDate = [datetime]::Now.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss"
 Write-Output "Analysis date: $AnalysisDate UTC"
 Write-Output ""
 
+# Create HashTable and import 'ASN-Blacklist.csv'
+$script:AsnBlacklist_HashTable = [ordered]@{}
+if (Test-Path "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv")
+{
+    if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv" -MaxLines 2)
+    {
+        Import-Csv "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv" -Delimiter "," | ForEach-Object { $AsnBlacklist_HashTable[$_.ASN] = $_.OrgName,$_.Info }
+
+        # Count Ingested Properties
+        $Count = $AsnBlacklist_HashTable.Count
+        Write-Output "[Info]  Initializing 'ASN-Blacklist.csv' Lookup Table ($Count) ..."
+    }
+}
+
+# Create HashTable and import 'Country-Blacklist.csv'
+$script:CountryBlacklist_HashTable = [ordered]@{}
+if (Test-Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv")
+{
+    if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv" -MaxLines 2)
+    {
+        Import-Csv "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv" -Delimiter "," | ForEach-Object { $CountryBlacklist_HashTable[$_.Country] = $_."Country Name" }
+
+        # Count Ingested Properties
+        $Count = $CountryBlacklist_HashTable.Count
+        Write-Output "[Info]  Initializing 'Country-Blacklist.csv' Lookup Table ($Count) ..."
+    }
+}
+
+# Create HashTable and import 'UserAgent-Blacklist.csv'
+$script:UserAgentBlacklist_HashTable = [ordered]@{}
+if (Test-Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv")
+{
+    if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -MaxLines 2)
+    {
+        Import-Csv "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -Delimiter "," | ForEach-Object { $UserAgentBlacklist_HashTable[$_.UserAgent] = $_.Category,$_.Severity }
+
+        # Count Ingested Properties
+        $Count = $UserAgentBlacklist_HashTable.Count
+        Write-Output "[Info]  Initializing 'UserAgent-Blacklist.csv' Lookup Table ($Count) ..."
+    }
+}
+
 #endregion Header
 
 #############################################################################################################################################################################################
@@ -240,6 +296,16 @@ if (!($Extension -eq ".csv" ))
     Exit
 }
 
+# Check IPinfo CLI Access Token 
+if ("$Token" -eq "access_token")
+{
+    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.ps1'" -ForegroundColor Red
+    Write-Host ""
+    Stop-Transcript
+    $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
+    Exit
+}
+
 # Input Size
 $InputSize = Get-FileSize((Get-Item "$LogFile").Length)
 Write-Output "[Info]  Total Input Size: $InputSize"
@@ -252,27 +318,16 @@ Write-Output "[Info]  Total Lines: $Rows"
 
 # Processing RiskyDetections.csv
 Write-Output "[Info]  Processing RiskyDetections.csv ..."
-New-Item "$OUTPUT_FOLDER\CSV" -ItemType Directory -Force | Out-Null
-New-Item "$OUTPUT_FOLDER\XLSX" -ItemType Directory -Force | Out-Null
+New-Item "$OUTPUT_FOLDER" -ItemType Directory -Force | Out-Null
 
-# Check Timestamp Format
-$Timestamp = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object ActivityDateTime -First 1).ActivityDateTime
-
-# de-DE
-if ($Timestamp -match "\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}")
-{
-    $script:TimestampFormat = "dd.MM.yyyy HH:mm:ss"
-}
-
-# en-US
-if ($Timestamp -match "\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} (AM|PM)")
-{
-    $script:TimestampFormat = "M/d/yyyy h:mm:ss tt"
-}
+# Import CSV
+$Data = Import-Csv -Path "$LogFile" -Delimiter "," | Sort-Object { $_.ActivityDateTime -as [datetime] } -Descending
 
 # Time Frame
-$StartDate = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object @{Name="ActivityDateTime";Expression={([DateTime]::ParseExact($_.ActivityDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}} | Sort-Object { $_.ActivityDateTime -as [datetime] } -Descending | Select-Object -Last 1).ActivityDateTime
-$EndDate = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object @{Name="ActivityDateTime";Expression={([DateTime]::ParseExact($_.ActivityDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}} | Sort-Object { $_.ActivityDateTime -as [datetime] } -Descending | Select-Object -First 1).ActivityDateTime
+$Last  = ($Data | Select-Object -Last 1).ActivityDateTime
+$First = ($Data | Select-Object -First 1).ActivityDateTime
+$StartDate = (Get-Date $Last).ToString("yyyy-MM-dd HH:mm:ss")
+$EndDate = (Get-Date $First).ToString("yyyy-MM-dd HH:mm:ss")
 Write-Output "[Info]  Log data from $StartDate UTC until $EndDate UTC"
 
 # CSV
@@ -285,6 +340,14 @@ $Results = [Collections.Generic.List[PSObject]]::new()
 ForEach($Record in $Data)
 {
     $AdditionalInfo = $Record.AdditionalInfo | ConvertFrom-Json
+
+    # Data Enrichment w/ IPInfo
+    $IPAddress   = $Record.IPAddress
+    $Data        = & $IPinfo "$IPAddress" --json | ConvertFrom-Json
+    $Country     = $Data.country
+    $CountryName = $Data.country_name
+    $ASN         = $Data | Select-Object -ExpandProperty org | ForEach-Object{($_ -split "\s+")[0]}
+    $OrgName     = $Data | Select-Object -ExpandProperty org | ForEach-Object {$_ -replace "^AS[0-9]+ "}
 
     $Line = [PSCustomObject]@{
     "Activity"                    = $Record.Activity # Indicates the activity type the detected risk is linked to.
@@ -300,10 +363,14 @@ ForEach($Record in $Data)
     "RiskLevel"                   = $Record.RiskLevel # Level of the detected risk.
     "RiskReasons"                 = ($AdditionalInfo | Where-Object {$_.Key -eq "riskReasons"}).Value -join ","
     "RiskState"                   = $Record.RiskState # The state of a detected risky user or sign-in.
-    "IPAddress"                   = $Record.IPAddress # Provides the IP address of the client from where the risk occurred.
+    "IPAddress"                   = $IPAddress # Provides the IP address of the client from where the risk occurred.
     "City"                        = $Record.City # Location of the sign-in.
-    "CountryOrRegion"             = $Record.CountryOrRegion # Location of the sign-in.
     "State"                       = $Record.State # Location of the sign-in.
+    "CountryOrRegion"             = $Record.CountryOrRegion # Location of the sign-in.
+    "Country"                     = $Country
+    "Country Name"                = $CountryName
+    "ASN"                         = $ASN
+    "OrgName"                     = $OrgName
     "DetectionTimingType"         = $Record.DetectionTimingType # Timing of the detected risk (real-time/offline).
     "Source"                      = $Record.Source # Source of the risk detection.
     "TokenIssuerType"             = $Record.TokenIssuerType # Indicates the type of token issuer for the detected sign-in risk. 
@@ -327,27 +394,27 @@ ForEach($Record in $Data)
     "Id"                          = $Record.Id # Unique ID of the risk event.
     "CorrelationId"               = $Record.CorrelationId # Correlation ID of the sign-in associated with the risk detection. 
     "RequestId"                   = $Record.RequestId # Request ID of the sign-in associated with the risk detection. This property is null if the risk detection is not associated with a sign-in.
-    "AdditionalProperties"        = $Record.AdditionalProperties # Empty
     }
 
     $Results.Add($Line)
 }
 
-$Results | Export-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -NoTypeInformation -Encoding UTF8
+$Results | Export-Csv -Path "$OUTPUT_FOLDER\RiskyDetections.csv" -NoTypeInformation -Encoding UTF8
 
 # XLSX
-if (Test-Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv")
+if (Test-Path "$OUTPUT_FOLDER\RiskyDetections.csv")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$OUTPUT_FOLDER\CSV\RiskyDetections.csv"))))
+    if(!([String]::IsNullOrWhiteSpace((Get-Content "$OUTPUT_FOLDER\RiskyDetections.csv"))))
     {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\XLSX\RiskyDetections.xlsx" -NoNumberConversion * -FreezePane 2,6 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Risky Detections" -CellStyleSB {
+        $IMPORT = Import-Csv "$OUTPUT_FOLDER\RiskyDetections.csv" -Delimiter "," -Encoding UTF8
+        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\RiskyDetections.xlsx" -NoNumberConversion * -FreezePane 2,6 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Risky Detections" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
         $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:AO1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-AO
-        $WorkSheet.Cells["A:AO"].Style.HorizontalAlignment="Center"
+        Set-Format -Address $WorkSheet.Cells["A1:AR1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns A-AR
+        $WorkSheet.Cells["A:AR"].Style.HorizontalAlignment="Center"
+        
         # ConditionalFormatting - MITRE ATT&CK Techniques
         Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1110.001",$H1)))' -BackgroundColor Red # Brute Force: Password Guessing --> https://attack.mitre.org/techniques/T1110/001/
         Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1110.003",$H1)))' -BackgroundColor Red # Brute Force: Password Spraying --> https://attack.mitre.org/techniques/T1110/003/
@@ -355,20 +422,59 @@ if (Test-Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv")
         Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1539",$H1)))' -BackgroundColor Red # Steal Web Session Cookie --> https://attack.mitre.org/techniques/T1539/
         Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1564.008",$H1)))' -BackgroundColor Red # Hide Artifacts: Email Hiding Rules --> https://attack.mitre.org/techniques/T1564/008/
         Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1589.001",$H1)))' -BackgroundColor Red # Gather Victim Identity Information: Credentials --> https://attack.mitre.org/techniques/T1589/001/
+        
         # ConditionalFormatting - RiskEventType
         Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("maliciousIPAddress",$J1)))' -BackgroundColor Red
         Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("mcasSuspiciousInboxManipulationRules",$J1)))' -BackgroundColor Red
         Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("nationStateIP",$J1)))' -BackgroundColor Red
         Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("passwordSpray",$J1)))' -BackgroundColor Red
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("unlikelyTravel",$J1)))' -BackgroundColor $Orange
+        
         # ConditionalFormatting - RiskLevel
         Add-ConditionalFormatting -Address $WorkSheet.Cells["K:K"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("high",$K1)))' -BackgroundColor Red
-        $Orange = [System.Drawing.Color]::FromArgb(255,192,0)
         Add-ConditionalFormatting -Address $WorkSheet.Cells["K:K"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("medium",$K1)))' -BackgroundColor $Orange
         Add-ConditionalFormatting -Address $WorkSheet.Cells["K:K"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("low",$K1)))' -BackgroundColor Yellow
-        $Green = [System.Drawing.Color]::FromArgb(0,176,80)
         Add-ConditionalFormatting -Address $WorkSheet.Cells["K:K"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("none",$K1)))' -BackgroundColor $Green
+        
         # ConditionalFormatting - RiskState
         Add-ConditionalFormatting -Address $WorkSheet.Cells["M:M"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("atRisk",$M1)))' -BackgroundColor Red
+        
+        # ConditionalFormatting - CountryOrRegion
+        foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$Q1)))' -f $Country
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["Q:Q"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        # ConditionalFormatting - Country
+        foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$R1)))' -f $Country
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["R:S"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        # ConditionalFormatting - ASN
+        foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$T1)))' -f $ASN
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["T:U"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        # ConditionalFormatting - UserAgent
+        foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
+        {
+            $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$Y1)))' -f $UserAgent
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["Y:Y"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+        }
+
+        # ConditionalFormatting - relatedLocation_countryCode
+        foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AH1)))' -f $Country
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["AH:AH"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+        
         }
     }
 }
@@ -383,77 +489,140 @@ $Users = '{0:N0}' -f $Count
 
 Write-Output "[Info]  $RiskyDetections Risky Detection(s) found ($Users Users)"
 
+#############################################################################################################################################################################################
+
 # Stats
-New-Item "$OUTPUT_FOLDER\Stats\CSV" -ItemType Directory -Force | Out-Null
-New-Item "$OUTPUT_FOLDER\Stats\XLSX" -ItemType Directory -Force | Out-Null
+New-Item "$OUTPUT_FOLDER\Stats" -ItemType Directory -Force | Out-Null
+
+$RiskyDetections = Import-Csv -Path "$OUTPUT_FOLDER\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Sort-Object { $_.ActivityDateTime -as [datetime] } -Descending
 
 # Activity (Stats)
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object Activity | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object Activity | Select-Object @{Name='Activity'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\Activity.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\Activity.csv")
+$Total = ($RiskyDetections | Select-Object Activity | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
+    $Stats = $RiskyDetections | Group-Object Activity | Select-Object @{Name='Activity'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\Activity.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Activity" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+    }
+}
+
+# ASN (Stats)
+$Total = ($RiskyDetections | Select-Object ASN | Where-Object {$_.ASN -ne '' } | Measure-Object).Count
+if ($Total -ge "1")
+{
+    $Stats = $RiskyDetections | Select-Object ASN,OrgName | Where-Object {$_.ASN -ne '' } | Where-Object {$null -ne ($_.PSObject.Properties | ForEach-Object {$_.Value})} | Group-Object ASN,OrgName | Select-Object @{Name='ASN'; Expression={ $_.Values[0] }},@{Name='OrgName'; Expression={ $_.Values[1] }},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\ASN.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ASN" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-D
+    $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
+
+    # Iterating over the ASN-Blacklist HashTable
+    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
     {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\Activity.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\Activity.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Activity" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        }
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $ASN
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    }
+}
+
+# ClientIP / Country Name (Stats)
+$Total = ($RiskyDetections | Select-Object IPAddress | Where-Object {$_.IPAddress -ne '' } | Measure-Object).Count
+if ($Total -ge "1")
+{
+    $Stats = $RiskyDetections | Select-Object IPAddress,Country,"Country Name",ASN,OrgName | Where-Object {$_.IPAddress -ne '' } | Where-Object {$_."Country Name" -ne '' } | Where-Object {$null -ne ($_.PSObject.Properties | ForEach-Object {$_.Value})} | Group-Object IPAddress,Country,"Country Name",ASN,OrgName | Select-Object @{Name='IPAddress'; Expression={ $_.Values[0] }},@{Name='Country'; Expression={ $_.Values[1] }},@{Name='Country Name'; Expression={ $_.Values[2] }},@{Name='ASN'; Expression={ $_.Values[3] }},@{Name='OrgName'; Expression={ $_.Values[4] }},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\IPAddress.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "IPAddress" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:G1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-G
+    $WorkSheet.Cells["A:G"].Style.HorizontalAlignment="Center"
+
+    # Iterating over the ASN-Blacklist HashTable
+    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$D1)))' -f $ASN
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["D:E"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    # Iterating over the Country-Blacklist HashTable
+    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$B1)))' -f $Country
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["B:C"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+                                    
+    }
+}
+
+# Country / Country Name (Stats)
+$Total = ($RiskyDetections | Select-Object Country | Where-Object {$_.Country -ne '' } | Measure-Object).Count
+if ($Total -ge "1")
+{
+    $Stats = $RiskyDetections | Select-Object Country,"Country Name" | Where-Object {$_.Country -ne '' } | Where-Object {$null -ne ($_.PSObject.Properties | ForEach-Object {$_.Value})} | Group-Object Country,"Country Name" | Select-Object @{Name='Country'; Expression={ $_.Values[0] }},@{Name='Country Name'; Expression={ $_.Values[1] }},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\Country.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Countries" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-D
+    $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
+
+    # Iterating over the Country-Blacklist HashTable
+    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $Country
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
     }
 }
 
 # DetectionTimingType (Stats)
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object DetectionTimingType | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object DetectionTimingType | Select-Object @{Name='DetectionTimingType'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\DetectionTimingType.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\DetectionTimingType.csv")
+$Total = ($RiskyDetections | Select-Object DetectionTimingType | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\DetectionTimingType.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\DetectionTimingType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "DetectionTimingType" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        }
+    $Stats = $RiskyDetections | Group-Object DetectionTimingType | Select-Object @{Name='DetectionTimingType'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\DetectionTimingType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "DetectionTimingType" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
 }
 
 # MITRE ATT&CK Techniques (Stats)
 # https://attack.mitre.org/matrices/enterprise/cloud/azuread/
 # https://attack.mitre.org/matrices/enterprise/cloud/office365/
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object mitreTechniques | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object mitreTechniques | Select-Object @{Name='mitreTechniques'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\mitreTechniques.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\mitreTechniques.csv")
+$Total = ($RiskyDetections | Select-Object mitreTechniques | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\mitreTechniques.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\mitreTechniques.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MITRE ATT&CK" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns B-C
-        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
-        # ConditionalFormatting
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1114.003",$A1)))' -BackgroundColor Red # Email Collection: Email Forwarding Rule --> https://attack.mitre.org/techniques/T1114/003/
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1539",$A1)))' -BackgroundColor Red # Steal Web Session Cookie --> https://attack.mitre.org/techniques/T1539/
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1564.008",$A1)))' -BackgroundColor Red # Hide Artifacts: Email Hiding Rules --> https://attack.mitre.org/techniques/T1564/008/
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1589.001",$A1)))' -BackgroundColor Red # Gather Victim Identity Information: Credentials --> https://attack.mitre.org/techniques/T1589/001/
-        }
+    $Stats = $RiskyDetections | Group-Object mitreTechniques | Select-Object @{Name='mitreTechniques'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\mitreTechniques.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MITRE ATT&CK" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns B-C
+    $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+    # ConditionalFormatting
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1110.001",$A1)))' -BackgroundColor Red # Brute Force: Password Guessing --> https://attack.mitre.org/techniques/T1110/001/
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1110.003",$A1)))' -BackgroundColor Red # Brute Force: Password Spraying --> https://attack.mitre.org/techniques/T1110/003/
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1114.003",$A1)))' -BackgroundColor Red # Email Collection: Email Forwarding Rule --> https://attack.mitre.org/techniques/T1114/003/
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1539",$A1)))' -BackgroundColor Red # Steal Web Session Cookie --> https://attack.mitre.org/techniques/T1539/
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1564.008",$A1)))' -BackgroundColor Red # Hide Artifacts: Email Hiding Rules --> https://attack.mitre.org/techniques/T1564/008/
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("T1589.001",$A1)))' -BackgroundColor Red # Gather Victim Identity Information: Credentials --> https://attack.mitre.org/techniques/T1589/001/
     }
 }
 
@@ -468,199 +637,169 @@ if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\mitreTechniques.csv")
 # T1589.001 - Gather Victim Identity Information: Credentials --> https://attack.mitre.org/techniques/T1589/001/
 
 # RiskEventType (Stats)
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object RiskEventType | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object RiskEventType | Select-Object @{Name='RiskEventType'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskEventType.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskEventType.csv")
+$Total = ($RiskyDetections | Select-Object RiskEventType | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskEventType.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskEventType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskEventType" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        # ConditionalFormatting
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("maliciousIPAddress",$A1)))' -BackgroundColor Red
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("mcasSuspiciousInboxManipulationRules",$A1)))' -BackgroundColor Red
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("passwordSpray",$A1)))' -BackgroundColor Red
-        }
+    $Stats = $RiskyDetections | Group-Object RiskEventType | Select-Object @{Name='RiskEventType'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\RiskEventType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskEventType" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+    # ConditionalFormatting
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("maliciousIPAddress",$A1)))' -BackgroundColor Red
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("mcasSuspiciousInboxManipulationRules",$A1)))' -BackgroundColor Red
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("passwordSpray",$A1)))' -BackgroundColor Red
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("unlikelyTravel",$A1)))' -BackgroundColor $Orange
     }
 }
 
 # RiskLevel (Stats)
 # Note: hidden --> Microsoft Entra ID Premium P2 required.
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object RiskLevel | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object RiskLevel | Select-Object @{Name='RiskLevel'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskLevel.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskLevel.csv")
+$Total = ($RiskyDetections | Select-Object RiskLevel | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskLevel.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskLevel.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskLevel" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        # ConditionalFormatting - RiskLevel
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("high",$A1)))' -BackgroundColor Red
-        $Orange = [System.Drawing.Color]::FromArgb(255,192,0)
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("medium",$A1)))' -BackgroundColor $Orange
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("low",$A1)))' -BackgroundColor Yellow
-        $Green = [System.Drawing.Color]::FromArgb(0,176,80)
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("none",$A1)))' -BackgroundColor $Green
-        }
+    $Stats = $RiskyDetections | Group-Object RiskLevel | Select-Object @{Name='RiskLevel'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\RiskLevel.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskLevel" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+    # ConditionalFormatting - RiskLevel
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("high",$A1)))' -BackgroundColor Red
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("medium",$A1)))' -BackgroundColor $Orange
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("low",$A1)))' -BackgroundColor Yellow
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:A"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("none",$A1)))' -BackgroundColor $Green
     }
 }
 
 # RiskDetail (Stats)
 # Note: hidden --> Microsoft Entra ID Premium P2 required.
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object RiskDetail | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object RiskDetail | Select-Object @{Name='RiskDetail'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskDetail.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskDetail.csv")
+$Total = ($RiskyDetections | Select-Object RiskDetail | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskDetail.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskDetail.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskDetail" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        }
+    $Stats = $RiskyDetections | Group-Object RiskDetail | Select-Object @{Name='RiskDetail'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\RiskDetail.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskDetail" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
 }
 
-# RiskReasons (Stats)
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object RiskReasons | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object RiskReasons | Select-Object @{Name='RiskReasons'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskReasons.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskReasons.csv")
+# Microsoft Entra ID Premium P2
+$P2 = (($RiskyDetections | Where-Object { $_.RiskDetail -match "hidden" }) -or ($RiskyDetections | Where-Object { $_.RiskLevel -match "hidden" }))
+if ($P2)
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskReasons.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskReasons.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskReasons" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns B-C
-        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+    Write-Output "[Info]  No Microsoft Entra ID Premium P2 found"
+}
 
-        }
+# RiskReasons (Stats)
+$Total = ($RiskyDetections | Select-Object RiskReasons | Measure-Object).Count
+if ($Total -ge "1")
+{
+    $Stats = $RiskyDetections | Group-Object RiskReasons | Select-Object @{Name='RiskReasons'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\RiskReasons.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskReasons" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns B-C
+    $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
 }
 
 # RiskState (Stats)
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object RiskState | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object RiskState | Select-Object @{Name='RiskState'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv")
+$Total = ($RiskyDetections | Select-Object RiskState | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskState.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskState" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-
-        }
+    $Stats = $RiskyDetections | Group-Object RiskState | Select-Object @{Name='RiskState'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\RiskState.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskState" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
 }
 
-# Source (Stats)
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object Source | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object Source | Select-Object @{Name='Source'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\Source.csv" -NoTypeInformation -Encoding UTF8
+# remediated
+# A remediated risk state in Microsoft Entra ID Protection means that a user has successfully taken actions to reduce their risk, such as completing multi-factor authentication (MFA) or changing their password. 
+# This indicates that the user's account is now considered protected and the risk has been mitigated. 
+# --> RiskDetail: User performed secured password reset
 
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\Source.csv")
+# Source (Stats)
+$Total = ($RiskyDetections | Select-Object Source | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\Source.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\Source.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Source" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        }
+    $Stats = $RiskyDetections | Group-Object Source | Select-Object @{Name='Source'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\Source.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Source" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
 }
 
 # UserAgent (Stats)
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object UserAgent | Measure-Object).Count
-Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," -Encoding UTF8 | Group-Object UserAgent | Select-Object @{Name='UserAgent'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\UserAgent.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\UserAgent.csv")
+$Total = ($RiskyDetections | Select-Object UserAgent | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
+    $Stats = $RiskyDetections | Group-Object UserAgent | Select-Object @{Name='UserAgent'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\UserAgent.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserAgent" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns B-C
+    $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+
+    # Iterating over the UserAgent-Blacklist HashTable
+    foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
     {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\UserAgent.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\UserAgent.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserAgent" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns B-C
-        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
-        }
+        $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $UserAgent
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+    }
+
     }
 }
 
 # Line Charts
-New-Item "$OUTPUT_FOLDER\Stats\XLSX\LineCharts" -ItemType Directory -Force | Out-Null
+New-Item "$OUTPUT_FOLDER\Stats\LineCharts" -ItemType Directory -Force | Out-Null
 
 # Risk Detections (Line Chart) --> Risk Detections per day
-$Import = Import-Csv "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Group-Object{($_.ActivityDateTime -split "\s+")[0]} | Select-Object Count,@{Name='ActivityDateTime'; Expression={ $_.Values[0] }} | Sort-Object { $_.ActivityDateTime -as [datetime] }
+$Import = $RiskyDetections | Group-Object{($_.ActivityDateTime -split "\s+")[0]} | Select-Object Count,@{Name='ActivityDateTime'; Expression={ $_.Values[0] }} | Sort-Object { $_.ActivityDateTime -as [datetime] }
 $ChartDefinition = New-ExcelChartDefinition -XRange ActivityDateTime -YRange Count -Title "Risk Detections" -ChartType Line -NoLegend -Width 1200
-$Import | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\LineCharts\RiskDetections.xlsx" -Append -WorksheetName "Line Chart" -AutoNameRange -ExcelChartDefinition $ChartDefinition
+$Import | Export-Excel -Path "$OUTPUT_FOLDER\Stats\LineCharts\RiskDetections.xlsx" -Append -WorksheetName "Line Chart" -AutoNameRange -ExcelChartDefinition $ChartDefinition
  
 # Risky Detections Count by User
-$Total = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Select-Object UserId | Measure-Object).Count
-Import-Csv "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Group-Object UserPrincipalName,UserId | Select-Object @{Name='UserPrincipalName'; Expression={ $_.Values[0] }},@{Name='UserId'; Expression={ $_.Values[1] }},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\UserPrincipalName.csv" -NoTypeInformation -Encoding UTF8
-
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\UserPrincipalName.csv")
+$Total = ($RiskyDetections | Select-Object UserId | Measure-Object).Count
+if ($Total -ge "1")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\UserPrincipalName.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\UserPrincipalName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserPrincipalName" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns B-D
-        $WorkSheet.Cells["B:D"].Style.HorizontalAlignment="Center"
-        }
+    $UPN = $RiskyDetections | Group-Object UserPrincipalName,UserId | Select-Object @{Name='UserPrincipalName'; Expression={ $_.Values[0] }},@{Name='UserId'; Expression={ $_.Values[1] }},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $UPN | Export-Excel -Path "$OUTPUT_FOLDER\Stats\UserPrincipalName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserPrincipalName" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns B-D
+    $WorkSheet.Cells["B:D"].Style.HorizontalAlignment="Center"
     }
 }
 
 # Number of Risky Users with Risk Level "High" (Last 7 days)
 $Date = (Get-Date).AddDays(-7)
-$Count = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
+$Count = ($RiskyDetections | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
 if ($Count -gt 0)
 {
     $HighRiskUsers = '{0:N0}' -f $Count
@@ -669,7 +808,7 @@ if ($Count -gt 0)
 
 # Number of Risky Users with Risk Level "High" (Last 30 days)
 $Date = (Get-Date).AddDays(-30)
-$Count = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
+$Count = ($RiskyDetections | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
 if ($Count -gt 0)
 {
     $HighRiskUsers = '{0:N0}' -f $Count
@@ -678,7 +817,7 @@ if ($Count -gt 0)
 
 # Number of Risky Users with Risk Level "High" (Last 90 days)
 $Date = (Get-Date).AddDays(-90)
-$Count = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
+$Count = ($RiskyDetections | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
 if ($Count -gt 0)
 {
     $HighRiskUsers = '{0:N0}' -f $Count
@@ -687,7 +826,7 @@ if ($Count -gt 0)
 
 # Number of Risky Users with Risk Level "High" (Past 6 months)
 $Date = (Get-Date).AddDays(-180)
-$Count = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
+$Count = ($RiskyDetections | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
 if ($Count -gt 0)
 {
     $HighRiskUsers = '{0:N0}' -f $Count
@@ -696,7 +835,7 @@ if ($Count -gt 0)
 
 # Number of Risky Users with Risk Level "High" (Past 12 months)
 $Date = (Get-Date).AddDays(-360)
-$Count = (Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
+$Count = ($RiskyDetections | Where-Object -FilterScript {[DateTime]::Parse($_.ActivityDateTime) -gt $Date}  | Where-Object { $_.RiskLevel -eq "high" } | Measure-Object).Count
 
 if ($Count -gt 0)
 {
@@ -709,7 +848,7 @@ else
 }
 
 # RiskState
-$Import = Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object { $_.RiskState -eq "atRisk" }
+$Import = $RiskyDetections | Where-Object { $_.RiskState -eq "atRisk" }
 $Total = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 $Count = ($Import | Select-Object UserId -Unique | Measure-Object).Count
 if ($Count -gt 0)
@@ -721,7 +860,7 @@ if ($Count -gt 0)
 
 # T1110.001 - Brute Force: Password Guessing
 # https://attack.mitre.org/techniques/T1110/001/
-$Import = Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object { $_.mitreTechniques -like "*T1110.001*" }
+$Import = $RiskyDetections | Where-Object { $_.mitreTechniques -like "*T1110.001*" }
 $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 if ($Count -gt 0)
 {
@@ -730,7 +869,7 @@ if ($Count -gt 0)
 
 # T1110.003 - Brute Force: Password Spraying
 # https://attack.mitre.org/techniques/T1110/003/
-$Import = Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object { $_.mitreTechniques -like "*T1110.003*" }
+$Import = $RiskyDetections | Where-Object { $_.mitreTechniques -like "*T1110.003*" }
 $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 if ($Count -gt 0)
 {
@@ -739,7 +878,7 @@ if ($Count -gt 0)
 
 # T1539 - Steal Web Session Cookie (AiTM)
 # https://attack.mitre.org/techniques/T1539/
-$Import = Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object { $_.mitreTechniques -like "*T1539*" }
+$Import = $RiskyDetections | Where-Object { $_.mitreTechniques -like "*T1539*" }
 $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 if ($Count -gt 0)
 {
@@ -748,7 +887,7 @@ if ($Count -gt 0)
 
 # T1589.001 - Gather Victim Identity Information: Credentials
 # https://attack.mitre.org/techniques/T1589/001/
-$Import = Import-Csv -Path "$OUTPUT_FOLDER\CSV\RiskyDetections.csv" -Delimiter "," | Where-Object { $_.mitreTechniques -like "*T1589.001*" }
+$Import = $RiskyDetections | Where-Object { $_.mitreTechniques -like "*T1589.001*" }
 $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 if ($Count -gt 0)
 {
@@ -776,7 +915,7 @@ Write-Output "$ElapsedTime"
 # Stop logging
 Write-Host ""
 Stop-Transcript
-Start-Sleep 2
+Start-Sleep 0.5
 
 # Reset Windows Title
 $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -789,8 +928,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUip3Ctb/mj4IgTulNoLPNMnUa
-# 8XGggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUnrHtPotACn5d2dwA7AEdh98s
+# WVeggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -992,33 +1131,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBRMaFbPfK8kaFw+vgC9a0rY/GzsdDANBgkqhkiG9w0B
-# AQEFAASCAgCLg2qJ9QO6iXq+sSa7iCpIWFcCoJzbDNhylFpRmyVglugcYiViQNpy
-# qHPuB1QQt6amq+VPSh0lLATAC4AvhOiXWVrs3p770MHXCugj8WrwiA66IZIvnh1u
-# tgeRIxVFIFtRDFZiUvrV09xMEbQi21UXmsInp3PCg7QyR5AlECN9xImQaFfmSHDP
-# e+ptrs6ykpX8L9nASRLM6a7O5jw0NeFu3+pgwKEz2q6HOTyV32vBqI6rEd+LBnv5
-# 4hrgxcFZly6j8S0D8A4XNNCB1EGUpH9U7hcQIEE+Xi7HR6QCp5ntBJV6QerzU5x1
-# 0unaUVKCHujFqUGWpFM+r0x0BeTcqS0tr/APtqa7HA/2mswO4dcIA7OXJzYbyvnW
-# IvS0x3Kir4t+C3JG7vqFFLICotxFHmDersXiYfbZqv1fvRHA4/K9/wV3chQ4IuLL
-# dTRCwPij6cT6WwPQs2LyOCuqrHdzn4rcnybmT/+e7pTb8H29G+SlZWPJoKum2pra
-# gUuQogCoPA04goThikJF7ywPM0oReJNXTUwC9cHzyXwQBrfo1sz77jHDN2MKi54i
-# QST+Z2RjHXsYJybl3wdMvmy/QG4k1PDzSweB3gJEkWkeKpS1KMN6mJjlU7ND8TFC
-# xfcqob5aH4FCNvOiunjE87HRvmqb75rLiK7zUJp18tNpbJCgLg9zX6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBT7i91ZZkHByo+4RxEzd8Ql+JRYejANBgkqhkiG9w0B
+# AQEFAASCAgCOVo8S8Pd/THbHgLiNd8MPZicE+BSSCksvCMscumNhem7JnlukFBQ8
+# tUBpxPU80Ycse5UifE8osC8QWPdNsNifiVa86bTLcbvM7OMj5yEW+6LKXspnze/n
+# CUZ6omUDJT5iTgKd019akyFwSshiksE+22kWQ6jG+guGb2u7SClM2MgfnUZQChjZ
+# TM/8ZSBfqJS8Yo7JMToavllVfQJJ8w/yFy7XVgywhAw4RWmTZy1t/sQL4TwZ5K2g
+# ImXha4umgSBvwdTiW6i+Ww/1gqbjk0/6pGB+F4zvB2Ixx32v6leMgvnrYnSOgukR
+# x1cyOiQIv3EXUMfCKj/DF8klGT7wjRzQ382UwlljbKHBX5MALoez0Num5cPPbfmG
+# y8Tu3/RNDrXrjpvYhNmNPzu7SZ5AZkzvMqe/EQicR3/+uzYjW7lrQo65AtXaPIfj
+# rCvEZq1njrdW3t38janlGl0D/tV8PxJLnz0Kry4NqEBFX83V8ttln6Bd9oBmmdm6
+# 9yNmz9PE//1XebW/5i9MscKM1jil4rYACkGvNshJ35Y83M8Pv9Sth4ZWyNFP/Dng
+# wleCRt6O9vQV9IBuSWQKFb92kjT6g0u2O4Wk7Yl//pe96n163WkzNO5E4Z+GxMB7
+# nZ1Wi8Dwy2X6bkCrgeN7ir6yEhewZzhWl9vAtmJ20e7EP/g4Vyv+PqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDUxNTA0NDcyOFowPwYJKoZIhvcNAQkEMTIEMHm8p6R7+OLTxsx1fOCNIZ4rxMFt
-# 5MQ/e6PhNTsMbUAuvK/lqSGmAd6CFpnt9Eg/NDANBgkqhkiG9w0BAQEFAASCAgC2
-# UBSXlqv2s0M/lS0VHRF4qfc+1oVxpoxA940AbqkYSBDL051+PnqzmVItKlukgvnI
-# iOkhXiXui8ohCq270zYayRyxMDRPk2qV4zFyLyhPhAhCj7Jb6Q11Ygo/D3nUNEus
-# qAC370vUvgsWreNSpn9HYbfMtkr9Y1YhF4WJQr5FIf8J65dvzJb1t854wl9uojKI
-# NJQB6fTsd/wFiEcPDR/MfmwaQ/p6LEjshBeX+494DranT5oZmXxjTVQsz13OOwuw
-# 6E/TgYr/R+bD5aGLJoQAX71NrNcz9Gp5buYAdvR63Gl1kF+g7kldxQqiwYU2E9Ha
-# T/KFNZxyTQA+HKr0ujX+PWDg7dX4CJ1DXAm/bjwAhRl98Sgli3h0jg9mtodxS6Om
-# S2vO9WW3yhv3NweWm03Nz6bnH8Q2dM+5rxeS2YCca7TCGg3RQoaEG8d1wIIOu7Yy
-# 4F6Uq5SWOmdYw3tybl12iUlg2T2XkX/zVXpWy2M41P1hOtkLZylvwlW0/7z1zf7e
-# zpihxkHfRo01uknBV7JkLuYY8/5FCCab/ra2DPfex+VUHOXbVGHNXL4G97FjEoDp
-# 3DMb3xNKwVNomrDbi443rfULOT7MM77mi68LqTdcYLqsXBBDlJB2MDAEe1b3yrV0
-# FePO3BLUEvutTAgvZdIzf9RS9rLAnjn8OoO+nOA+KQ==
+# MDYwMzA3NDU1OFowPwYJKoZIhvcNAQkEMTIEMKiyjbw0+SOYVjljTK9FT1iiwdZd
+# hYNLZ0CUo/vTuDlFW4spzA+bAaoSqyJyjrGtSzANBgkqhkiG9w0BAQEFAASCAgBN
+# Z8MURVhV5kjNJvXWStsKPFIwmRcg+Nf6k4V+F9ZJ/192ZV91feFWzTUGBHVcgiGr
+# EvRaTmEM4akEOY9VB/H4cSpoDGDSlr7yJxAT6l1XxLL/+b8TBvHjq3U3wlY/nlYf
+# cyFvTVurD2dsc6hT3h25g4p/GIRzRBW5bdCW7NdhzIz24msxa/J/8nn4fn7WYZ03
+# KmFzFEEXtUQLph0mVVRvqDgEjA4nnXrTzssFYu38qF9W+zkD8SBaDCdmxtvSc9zN
+# hSd3rTp/V8/JPNQdBZJuCMfZag6OzBQ9yqMZaQGpZcPg4RC1BwQRS0aXHp+g2HDU
+# +tFWVuk3S8mwt99CHcxya/q9HLt02eqb9j7rgILwPlTc0McQD/+mO1ybPfMFMTv2
+# vInHWnI7RKJLeKOn9MO0z96wrVPno3AVvtRGsn5QbejnFmZ1Bja112N9z/cZfo5Q
+# 0a/TRcxTxX6Lmu/1vxOKoDCmpaMqUnGMGS+2dbaCKWAHpUxGkynW5dWW5wUOWBuc
+# 5B+U0gkFRA64UlD4bfcwyp0YJlHIkmG0/EIZrse0q2JFBE6zEfP6SzqVauyfx68S
+# UA6/wbT46IS6vEY8hJwINcw3RULhzLzMbJnVl5iHsQpRkDGbS7rs58FN0eJYwP3N
+# EL1PYodzZW2nVheAIqeSZnhQlvnWEFBuPuYe2KFL+w==
 # SIG # End signature block

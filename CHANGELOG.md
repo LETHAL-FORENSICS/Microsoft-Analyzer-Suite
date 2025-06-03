@@ -2,6 +2,18 @@
 
 All changes to the Microsoft-Analyzer-Suite will be documented in this file.  
 
+## [1.5.1] - 2025-06-03
+### Added
+- RiskyDetections-Analyzer: ASN-Blacklist.csv
+- RiskyDetections-Analyzer: Country-Blacklist.csv
+- RiskyDetections-Analyzer: UserAgent-Blacklist.csv
+- RiskyDetections-Analyzer: Check for Microsoft Entra ID Premium P2 license
+- RiskyDetections-Analyzer: IP Enrichment w/ IPinfo
+
+## Fixed
+- EntraSignInLogs-Analyzer: CreatedDateTime
+- EntraAuditLogs-Analyzer: ActivityDateTime
+
 ## [1.5.0] - 2025-05-15
 ### Added
 - EntraSignInLogs-Analyzer: OriginalTransferMethod

@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-05-15
+# @date:      2025-06-03
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 5.1 (5.1.19041.5737)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
 #
 #
 #############################################################################################################################################################################################
@@ -39,7 +39,7 @@
 .DESCRIPTION
   EntraSignInLogs-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of Microsoft Entra ID Sign-In Logs extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.3)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/AzureActiveDirectorysign-inlogs.html
 
@@ -394,8 +394,8 @@ $Data = Get-Content -Path "$LogFile" -Raw | ConvertFrom-Json | Sort-Object { $_.
 # Time Frame
 $Last  = ($Data | Sort-Object { $_.createdDateTime -as [datetime] } -Descending | Select-Object -Last 1).createdDateTime
 $First = ($Data | Sort-Object { $_.createdDateTime -as [datetime] } -Descending | Select-Object -First 1).createdDateTime
-$StartDate = (Get-Date $Last).ToString("yyyy-MM-dd HH:mm:ss")
-$EndDate = (Get-Date $First).ToString("yyyy-MM-dd HH:mm:ss")
+$StartDate = (Get-Date $Last).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+$EndDate = (Get-Date $First).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
 Write-Output "[Info]  Log data from $StartDate UTC until $EndDate UTC"
 
 # Untouched
@@ -422,7 +422,7 @@ ForEach($Record in $Data)
 
     $Line = [PSCustomObject]@{
     "Id"                             = $Record.Id # The identifier representing the sign-in activity.
-    "CreatedDateTime"                = (Get-Date $CreatedDateTime).ToString("yyyy-MM-dd HH:mm:ss")
+    "CreatedDateTime"                = (Get-Date $CreatedDateTime).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
     "UserDisplayName"                = $Record.userDisplayName # The display name of the user.
     "UserPrincipalName"              = $Record.userPrincipalName # The UPN of the user.
     "UserId"                         = $Record.userId # The identifier of the user.
@@ -483,6 +483,7 @@ ForEach($Record in $Data)
     "TokenIssuerName"                = $Record.TokenIssuerName # The name of the identity provider.
     "TokenIssuerType"                = $Record.TokenIssuerType # The type of identity provider.
     "UniqueTokenIdentifier"          = $Record.UniqueTokenIdentifier # A unique base64 encoded request identifier used to track tokens issued by Microsoft Entra ID as they're redeemed at resource providers.
+    "SessionId"                      = $Record.SessionId # Identifier of the session that was generated during the sign-in.
     "UserAgent"                      = $Record.UserAgent # The user agent information related to sign-in.
     "UserType"                       = $Record | Select-Object -ExpandProperty UserType | ForEach-Object { $_.Replace("member","Member") } | ForEach-Object { $_.Replace("guest","Guest") } # Identifies whether the user is a member or guest in the tenant.
     "AuthenticationProtocol"         = $Record.AuthenticationProtocol # Lists the protocol type or grant type used in the authentication.
@@ -516,13 +517,13 @@ ForEach($Record in $Data)
 $Results | Export-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\CSV\Untouched.csv" -NoTypeInformation -Encoding UTF8
 
 # XLSX
-$Results | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Untouched.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInLogsGraph" -CellStyleSB {
+$Results | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Untouched.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInLogsGraph" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
 $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:BR1"] -BackgroundColor $BackgroundColor -FontColor White
-# HorizontalAlignment "Center" of columns A-BR
-$WorkSheet.Cells["A:BR"].Style.HorizontalAlignment="Center"
+Set-Format -Address $WorkSheet.Cells["A1:BS1"] -BackgroundColor $BackgroundColor -FontColor White
+# HorizontalAlignment "Center" of columns A-BS
+$WorkSheet.Cells["A:BS"].Style.HorizontalAlignment="Center"
 }
 
 # UserId
@@ -987,6 +988,7 @@ if (Test-Path "$($IPinfo)")
                                             "UserAgent"                    = $Record.UserAgent
                                             "UserType"                     = $Record.UserType
                                             "TrustedNamedLocation"         = $Record.TrustedNamedLocation
+                                            "SessionId"                    = $Record.SessionId
                                             "CrossTenantAccessType"        = $Record.CrossTenantAccessType
                                         }
 
@@ -1003,14 +1005,14 @@ if (Test-Path "$($IPinfo)")
                                 if(Test-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\CSV\Hunt.csv" -MaxLines 2)
                                 {
                                     $IMPORT = Import-Csv "$OUTPUT_FOLDER\EntraSignInLogs\CSV\Hunt.csv" -Delimiter "," | Sort-Object { $_.CreatedDateTime -as [datetime] } -Descending
-                                    $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Hunt.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -WorkSheetname "Hunt" -CellStyleSB {
+                                    $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Hunt.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -WorkSheetname "Hunt" -CellStyleSB {
                                     param($WorkSheet)
                                     # BackgroundColor and FontColor for specific cells of TopRow
                                     $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                                    Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor White
-                                    # HorizontalAlignment "Center" of columns A-X and AA-AZ
+                                    Set-Format -Address $WorkSheet.Cells["A1:BA1"] -BackgroundColor $BackgroundColor -FontColor White
+                                    # HorizontalAlignment "Center" of columns A-X and AA-BA
                                     $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
-                                    $WorkSheet.Cells["AA:AZ"].Style.HorizontalAlignment="Center"
+                                    $WorkSheet.Cells["AA:BA"].Style.HorizontalAlignment="Center"
                                     
                                     # ConditionalFormatting - AppId
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["F:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("29d9ed98-a469-4536-ade2-f981bc1d605e",$F1)))' -BackgroundColor Red # Microsoft Authentication Broker
@@ -1214,7 +1216,7 @@ if (Test-Path "$($IPinfo)")
                             }
 
                             # XLSX
-                            $Results | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Hunt.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -WorkSheetname "Hunt" -CellStyleSB {
+                            $Results | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Hunt.xlsx" -NoNumberConversion * -NoHyperlinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -WorkSheetname "Hunt" -CellStyleSB {
                             param($WorkSheet)
                             # BackgroundColor and FontColor for specific cells of TopRow
                             $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
@@ -1349,7 +1351,7 @@ if ($Total -ge "1")
     }
 
     # ConditionalFormatting - AppId
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("2793995e-0a7d-40d7-bd35-6968ba142197",$B1)))' -BackgroundColor Yellow # 'My Apps' portal --> Potential App Discovery by Threat Actor
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("2793995e-0a7d-40d7-bd35-6968ba142197",$B1)))' -BackgroundColor Yellow # 'My Apps' portal --> Potential App Discovery by Threat Actor
 
     }
 }
@@ -2015,8 +2017,8 @@ if ($Count -ge 1)
     New-Item "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\XLSX" -ItemType Directory -Force | Out-Null
 
     # CSV
-    $Import | Group-Object{($_.CreatedDateTime -split "\s+")[0]} | Where-Object Count -ge $Threshold | Select-Object Name,Count | Export-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\Brute-Force-Attack\CSV\Brute-Force-Attack-Overview.csv" -NoTypeInformation -Encoding UTF8
-    $Import | Group-Object{($_.CreatedDateTime -split "\s+")[0]} | Where-Object Count -ge $Threshold | Select-Object -Expand Group | Export-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\Brute-Force-Attack\CSV\Brute-Force-Attack.csv" -NoTypeInformation -Encoding UTF8
+    $Import | Group-Object{($_.CreatedDateTime -split "\s+")[0]} | Where-Object Count -ge $Threshold | Select-Object Name,Count | Export-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\CSV\Brute-Force-Attack-Overview.csv" -NoTypeInformation -Encoding UTF8
+    $Import | Group-Object{($_.CreatedDateTime -split "\s+")[0]} | Where-Object Count -ge $Threshold | Select-Object -Expand Group | Export-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\CSV\Brute-Force-Attack.csv" -NoTypeInformation -Encoding UTF8
 
     # Brute-Force-Attack-Overview.xlsx
     if (Test-Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\CSV\Brute-Force-Attack-Overview.csv")
@@ -2040,28 +2042,96 @@ if ($Count -ge 1)
     {
         if(Test-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\CSV\Brute-Force-Attack.csv" -MaxLines 2)
         {
-            $IMPORT = Import-Csv "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\CSV\Brute-Force-Attack.csv" -Delimiter ","
-            $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\XLSX\Brute-Force-Attack.xlsx" -NoNumberConversion * -FreezePane 2,4 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Brute-Force Attack" -CellStyleSB {
+            $IMPORT = Import-Csv "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\CSV\Brute-Force-Attack.csv" -Delimiter "," -Encoding UTF8
+            $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\XLSX\Brute-Force-Attack.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Brute-Force Attack" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
             $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-            Set-Format -Address $WorkSheet.Cells["A1:AU1"] -BackgroundColor $BackgroundColor -FontColor White
-            # HorizontalAlignment "Center" of columns A-X and AA-AU
+            Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor White
+            # HorizontalAlignment "Center" of columns A-X, AA-AV and AX-AZ
             $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
-            $WorkSheet.Cells["AA:AU"].Style.HorizontalAlignment="Center"
-            # ConditionalFormatting
-            Add-ConditionalFormatting -Address $WorkSheet.Cells["AA:AA"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Failure",$AA1)))' -BackgroundColor Red
-            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Authenticated SMTP",$H1)))' -BackgroundColor Red
+            $WorkSheet.Cells["AA:AV"].Style.HorizontalAlignment="Center"
+            $WorkSheet.Cells["AX:AZ"].Style.HorizontalAlignment="Center"
+
+            # Iterating over the ASN-Blacklist HashTable
+            foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+            {
+                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AS1)))' -f $ASN
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["AS:AT"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
             }
+
+            # Iterating over the Country-Blacklist HashTable
+            foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+            {
+                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AP1)))' -f $Country
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["AP:AQ"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+            }
+
+            # Iterating over the UserAgent-Blacklist HashTable
+            foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
+            {
+                $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AW1)))' -f $UserAgent
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["AW:AW"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+            }
+
+            # ConditionalFormatting - ClientAppUsed
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Authenticated SMTP",$H1)))' -BackgroundColor Red
+
+            # ConditionalFormatting - Status
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["AA:AA"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Failure",$AA1)))' -BackgroundColor Red
+            
+            # ConditionalFormatting - TrustedNamedLocation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Yes",$AY1)))' -BackgroundColor $Green # Trusted IP Ranges / Trusted Countries
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("No",$AY1)))' -BackgroundColor Red # Untrusted Location
+                 
+            }
+        }
+    }
+
+    # Stats
+    New-Item "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\Stats" -ItemType Directory -Force | Out-Null
+
+    $Failures = Import-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\CSV\Brute-Force-Attack.csv" -Delimiter "," -Encoding UTF8
+
+    # AppDisplayName (Stats)
+    $Total = ($Failures | Select-Object Failure | Measure-Object).Count
+    if ($Total -ge "1")
+    {
+        $Stats = $Failures | Group-Object AppDisplayName,AppId | Select-Object @{Name='AppDisplayName'; Expression={ $_.Values[0] }},@{Name='AppId'; Expression={ $_.Values[1] }},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+        $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\Stats\AppDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppDisplayName" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns B-D
+        $WorkSheet.Cells["B:D"].Style.HorizontalAlignment="Center"
+        }
+    }
+
+    # UserPrincipalName / Status (Stats)
+    $Total = ($Failures | Select-Object Failure | Measure-Object).Count
+    if ($Total -ge "1")
+    {
+        $Stats = $Failures | Select-Object UserPrincipalName,Status | Group-Object UserPrincipalName,Status | Select-Object @{Name='UserPrincipalName'; Expression={ $_.Values[0] }},@{Name='Status'; Expression={ $_.Values[1] }},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+        $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\Stats\UserPrincipalName-Status.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserPrincipalName" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns A-D
+        $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
         }
     }
 }
 
-# LETHAL-002: Brute-Force Detection - Error Code
-$Count = ($Hunt | Where-Object {($_.ErrorCode -eq '50126' -or $_.ErrorCode -eq '50053')} | Measure-Object).Count
+# LETHAL-002: Potential Brute-Force Detection - Error Code
+$Import = $Hunt | Where-Object {($_.ErrorCode -eq '50126' -or $_.ErrorCode -eq '50053')}
+$Count = ($Import | Measure-Object).Count
 if ($Count -ge 1)
 {
-    Write-Host "[Alert] Brute-Force Attack detected: Incorrect Credentials and/or Account has been locked ($Count)" -ForegroundColor Red
+    $Users = ($Import | Select-Object UserId -Unique | Measure-Object).Count
+    Write-Host "[Alert] Potential Brute-Force Attack detected: Incorrect Credentials and/or Account has been locked ($Users Users, $Count Events)" -ForegroundColor Red
 }
 
 # 50126 - Error validating credentials due to invalid username or password.
@@ -2145,7 +2215,7 @@ if ($Count -ge 1)
 
         $Line = [PSCustomObject]@{
         "Id"                               = $SignIn.id
-        "CreatedDateTime"                  = (Get-Date $SignIn.createdDateTime).ToString("yyyy-MM-dd HH:mm:ss")
+        "CreatedDateTime"                  = (Get-Date $SignIn.createdDateTime).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
         "UserDisplayName"                  = $SignIn.userDisplayName
         "UserPrincipalName"                = $SignIn.userPrincipalName
         "UserId"                           = $SignIn.userId
@@ -2266,7 +2336,7 @@ $Users = ($Import | Select-Object UserId -Unique | Measure-Object).Count
 
 if ($Count -ge 1)
 {
-    Write-Host "[Alert] Potential Adversary-in-the-Middle (AitM) Phishing Attack(s) detected ($Users credentials, $Count events)" -ForegroundColor Red
+    Write-Host "[Alert] Potential Adversary-in-the-Middle (AitM) Phishing Attack(s) detected ($Users Users, $Count Events)" -ForegroundColor Red
     New-Item "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\AiTM\CSV" -ItemType Directory -Force | Out-Null
     New-Item "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\AiTM\XLSX" -ItemType Directory -Force | Out-Null
 
@@ -2550,7 +2620,7 @@ if ($Count -ge 1)
 
 # LETHAL-016: Suspicious Sign-Ins via Cross-Tenant Synchronization (CTS) --> Possible Lateral Movement
 $Import = $Hunt | Where-Object { $_.CrossTenantAccessType -eq "b2bCollaboration" }
-$Count = ($Import | Measure-Object).Count
+$Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 
 if ($Count -ge 1)
 {
@@ -2586,10 +2656,6 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\Application-Blacklist.csv")
     {
         Import-Csv "$SCRIPT_DIR\Blacklists\Application-Blacklist.csv" -Delimiter "," | ForEach-Object { $ApplicationBlacklist_HashTable[$_.AppId] = $_.AppDisplayName,$_.Severity }
 
-        # Count Ingested Properties
-        $Count = $ApplicationBlacklist_HashTable.Count
-        Write-Output "[Info]  Initializing 'Application-Blacklist.csv' Lookup Table ($Count) ..."
-
         # Iterating over the HashTable
         foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
         {
@@ -2615,10 +2681,6 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv")
     {
         Import-Csv "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv" -Delimiter "," | ForEach-Object { $AsnBlacklist_HashTable[$_.ASN] = $_.OrgName,$_.Info }
 
-        # Count Ingested Properties
-        $Count = $AsnBlacklist_HashTable.Count
-        Write-Output "[Info]  Initializing 'ASN-Blacklist.csv' Lookup Table ($Count) ..."
-
         # Iterating over the HashTable
         foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
         {
@@ -2634,56 +2696,25 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv")
 }
 
 # LETHAL-019: Country Blacklist
-
-# Create HashTable and import 'Country-Blacklist.csv'
-$CountryBlacklist_HashTable = [ordered]@{}
-if (Test-Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv")
+foreach ($CountryName in $CountryBlacklist_HashTable.Keys) 
 {
-    if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv" -MaxLines 2)
+    $Import = $Hunt | Where-Object { $_."Country Name" -eq "$CountryName" }
+    $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
+    if ($Count -gt 0)
     {
-        Import-Csv "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv" -Delimiter "," | ForEach-Object { $CountryBlacklist_HashTable[$_."Country Name"] = $_.Country }
-
-        # Count Ingested Properties
-        $Count = $CountryBlacklist_HashTable.Count
-        Write-Output "[Info]  Initializing 'Country-Blacklist.csv' Lookup Table ($Count) ..."
-
-        # Iterating over the HashTable
-        foreach ($CountryName in $CountryBlacklist_HashTable.Keys) 
-        {
-            $Import = $Hunt | Where-Object { $_."Country Name" -eq "$CountryName" }
-            $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
-            if ($Count -gt 0)
-            {
-                Write-Host "[Alert] Suspicious Country detected: $CountryName ($Count)" -ForegroundColor Red
-            }
-        }
+        Write-Host "[Alert] Suspicious Country detected: $CountryName ($Count)" -ForegroundColor Red
     }
 }
 
 # LETHAL-020: User-Agent Blacklist
-
-# Create HashTable and import 'UserAgent-Blacklist.csv'
-$UserAgentBlacklist_HashTable = [ordered]@{}
-if (Test-Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv")
+foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
 {
-    if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -MaxLines 2)
+    $Import = $Hunt | Where-Object { $_.UserAgent -eq "$UserAgent" }
+    $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
+    if ($Count -gt 0)
     {
-        Import-Csv "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -Delimiter "," | ForEach-Object { $UserAgentBlacklist_HashTable[$_.UserAgent] = $_.Category,$_.Severity }
-
-        # Count Ingested Properties
-        $Count = $UserAgentBlacklist_HashTable.Count
-        Write-Output "[Info]  Initializing 'UserAgent-Blacklist.csv' Lookup Table ($Count) ..."
-
-        # Iterating over the HashTable
-        foreach ($CountryName in $CountryBlacklist_HashTable.Keys) 
-        {
-            $Import = $Hunt | Where-Object { $_."Country Name" -eq "$CountryName" }
-            $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
-            if ($Count -gt 0)
-            {
-                Write-Host "[Alert] Suspicious Country detected: $CountryName ($Count)" -ForegroundColor Red
-            }
-        }
+        $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+        Write-Host "[Alert] Suspicious User-Agent detected: $UserAgent ($Count)" -ForegroundColor $Severity
     }
 }
 
@@ -2768,8 +2799,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUOnkI5fWewdao1TVqJr9n7/5s
-# O+KggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUj13QFSM+3HObf+JRHwxnF81G
+# A8SggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -2971,33 +3002,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBTL87so8vazTgmtuiyAbCul9nXtODANBgkqhkiG9w0B
-# AQEFAASCAgBZb0wMZsbIBbqwev3+2LoIJ2xDHYoaDFwmV9yk7QT61cQalgJ5AqBW
-# RYVxw4UoGciJhQLezdGKQw3c30xshCY5wSkgAKfv4WQUT1aHbth21bKDDxlhDtnB
-# dRXvl62JdAsQcGMfmvGEjz0qg7h+zbXVUk8LmgtN1ShJiCuFFFDzDb2DO/3A3tNL
-# se7wIAAHbNRYWZMP1wFTSajc5ar+B5JLhcdgXZXhmJ5gW0LPfGQr+m29/i5HCmfY
-# z/Fu0kEv8oH/9AuU0oMjgGh3dMRM6soRt1Ij5JrtDrJEFSTOkEfmHQAEo94iRPlv
-# GYX6BsGYeTxO1sls/45c9UKR7VR6ORnTIvVfab1Rqs9TWvSfUolmMCEh/nKjKdI0
-# QgEGUNKwUlTb2PvdLZHC4i4VmVLknAR8HPm8l798lwV7DOjijDmC1lHJspIlwWa4
-# zp82rn1XulWFH1p8tFKnY/+iUPpadzLWkT7LiALNqM0oCliKKZGx0MtqfSulFFqj
-# BxBEVHN7cJIzDIdhfAFmY7mhDsgldWoG4MRUId+9mjUYryfH121qTtw/Qlp5YxVZ
-# LnkouTCydD43Y2ZTaKVPO5DK6a/8qS2jhCurnA/lGsHYiiRVFarz2pDpIv9mEvG0
-# FCQ0OV0GBUSp64FBumnEQxaDRmT4/W1BQbhYtr0FGVQDRxgsT2qfhaGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQEFIGKATgdcjauaeOyCfhxO51rITANBgkqhkiG9w0B
+# AQEFAASCAgC8/JJNpHjvz/OByAFf2X3dHULp6amDSivJxjdMuhL81RLKfia6xkIL
+# dIegEihDwxUdDYYai3FIbCWx70SGJUytkliqzHQV9Y+xPmjRKkGVeQ50U7CVpfrQ
+# skn0qtqKWTQ/6euSrA5/qpPZkSJMib+AjpjqkTJP7PH7SXHLdTuICEjIjzFmRJ38
+# nMSMwdT6umZD7RkdrvHbhEOAcyiplUhpK70gB+mYZ5FrCjVy65yOhyLVRDO0YKSF
+# jNcl/pf0EPNOudVvHK64Z7OST2BaX+4hzE6PBPA2t4IyO5crJL1GFTfYU+e0Z+oQ
+# X8Y65Bo3bJ/5V0JC0RdgMzrobZ16zhKHMz+m+Lbod02+GyePGIfCDw8h6sep4fUw
+# n09r4v+3UQqI3EZynV/HFgWL2O0pOPA+h1nneE8tMX2yjKgTLUr4tXe8i0TLqq6f
+# OujveGagMVI6q9Bfs+9i248KUPtEiYe5SM5MlPGkWPrNBmpskXxEZVxJDPZxmwKX
+# roqEcYWn3byklPPZO2NVH9+Fbc9YuS1lWtwHz2wsxT2WQGc9ayV6SyfZ2RefWEWt
+# gm4a1LSFdISIbBIi3GAPFb63oFtw5YuMwHALWX7db9mhuLzWyFFWSc7U3FFqdEeH
+# z+Rbx6I5ncO8MMf4U6OO2DwIw5ihSEZLjS0KQ8KqzseqemWrnhAS0aGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDUxNTA0NDcwOFowPwYJKoZIhvcNAQkEMTIEMKlbZBZq0fYXOKhuYaAGET0GyvZO
-# PKVHTakbeS5+2yR5iLm5OWNnwTsjgW8FORAfwzANBgkqhkiG9w0BAQEFAASCAgAG
-# 2srBnqJWJPCOZDq8myQ/r5J23WRkPXHRPiJDlNuRIXgVHLnHDjdaFszBNN49y59H
-# heTLAw8rIufgF43zBp3oSjDDQ0Kg5/t81jamfusHvhvn9PHdeCek3fzJ+3Zfidxo
-# 3MlkmJ09yq3FvvFElW7+nZ1Hwc6pzye3y9zic64XklBLou8KyFia0e4t1H2KTems
-# XQYvlTYsEH2TSHVf/bkcIsELUM4Ubi7Jl4rmbKS5rkjyoxgpgkz+bG/jc0BYlPvK
-# SQ8JUBvkNI563AZL8LAzEPl9ye9LxePzrtnZk+xYAh1cg0uJRO3iRfpr9UnYaret
-# ScZ0Q/uBetjD6hKJ28l678Q2t9PlJDgDFoZQ76JxrFXeBfARkfZxRpHWngyBKCrA
-# RebZp+PqUZY7UPbx6xnfVQh+NdZCgl4Q7aJ8XdYNYrGg839jPTFQTMHpeQfzHuPQ
-# QyAbp5ZQIFhIUvkjwSZ0pJQISTO61tQws+oFneep7tfjD83x2AEobWG99nlngcc2
-# ZnFoVtqggzlFomGArmtO8t3eL15hO/5FcviF7hTWpa13jWCvI6eV2Hw3sWgguksh
-# 4oDsh8jj3Who5LVta/evJTa+BgnbQWqdMuOPF7aeKWwxHAGe5KEED/vCsfBCPlSe
-# XXujFMxgYtVBVKMqPuVEj+GtdqRybQxyHJOpthQfNw==
+# MDYwMzA3NDUzOVowPwYJKoZIhvcNAQkEMTIEMFyVmjKGGJ5DD50lrLniqOY670NI
+# 8V2jDmHgp7G/dtigVrkM0i+rv6OIc8G5QLeedTANBgkqhkiG9w0BAQEFAASCAgCs
+# R4KzxF2wFK7ec5efkqJ2SX47fivrv5be+8c3hj14u7CQCfOmCqoW8T0sjGefGahg
+# gGy9ltJ4J2O/Xb/186wRGLrA8maGA2LJv6THKjPdY13uf33siq5HC+pFphIOlZyU
+# EZbjrsDRcGNjVOmYFS4KkeI+mqOnooceVwF8ze/Pydb0wHWBWi1AWwrW5xZmgUO3
+# vgZYNdx4tupiTBJf9fw0r8y7W58AUByZ8NlAvkSkybjF9s9RTVKqggyLTV0NTGYg
+# 616jbJ5XWzxxopRxpZy+dELeQ032U/w5ri25uDClNvFH+oslkrymdWtCQCnLbN9c
+# VL8Rx0S9TJ0jSpEVRQyJcGgB2G8Mbl9xOFwrqZG2zqpn8pMbRv6M2FZAxFDNZ0P/
+# t4+ReGF3aqjhucdVWlVMj8dNJlTZbhjTVS5RdBVzeK0eomfEClZuMzZYywDzszGR
+# 7cH1Phgypt9bnL77ME1sMoQYhvMTPQmnwCUY/Yc6UT2Mr4J8jxK5Bl1F34Y7tpZd
+# f7c07aJcylQe2FMvk3nFd46acgCjQS7QN5RWBFag8DLO4USUQCONziBYq9vG/j1y
+# 5nypiOonGWWXMD4g2yYDLOyY52KvDnPdPzKpPID7td8/Ip/lutwlzUHXe2m7tmvU
+# I9Mtmi/ITYUKTWDuWqF+eh/HcgyGv5SB6iRI/NQJoQ==
 # SIG # End signature block

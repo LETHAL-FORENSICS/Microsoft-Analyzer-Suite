@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-05-15
+# @date:      2025-06-03
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 5.1 (5.1.19041.5737)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
 #
 #
 #############################################################################################################################################################################################
@@ -35,7 +35,7 @@
 .DESCRIPTION
   MFA-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of the MFA Status of all users extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.3)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieves-mfa-status
 
@@ -280,7 +280,7 @@ if (Test-Path "$AuthenticationMethods")
         $Results.Add($Line)
     }
 
-    $Results | Export-Csv -Path "$OUTPUT_FOLDER\CSV\AuthenticationMethods.csv" -NoTypeInformation
+    $Results | Export-Csv -Path "$OUTPUT_FOLDER\CSV\AuthenticationMethods.csv" -NoTypeInformation -Encoding UTF8
 }
 
 # XLSX
@@ -393,7 +393,7 @@ if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\MFA-Status.csv")
 {
     if(!([String]::IsNullOrWhiteSpace((Get-Content "$OUTPUT_FOLDER\Stats\CSV\MFA-Status.csv"))))
     {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\MFA-Status.csv" -Delimiter ","
+        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\MFA-Status.csv" -Delimiter "," -Encoding UTF8
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\MFA-Status.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MFA-Status" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
@@ -434,7 +434,7 @@ if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\AuthenticationMethod.csv")
 {
     if(!([String]::IsNullOrWhiteSpace((Get-Content "$OUTPUT_FOLDER\Stats\CSV\AuthenticationMethod.csv"))))
     {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\AuthenticationMethod.csv" -Delimiter "," | Select-Object AuthenticationMethod,Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}}
+        $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\AuthenticationMethod.csv" -Delimiter "," -Encoding UTF8 | Select-Object AuthenticationMethod,Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}}
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\AuthenticationMethod.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Authentication Method" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
@@ -501,6 +501,12 @@ if (Test-Path "$UserRegistrationDetails")
         $script:TimestampFormat = "M/d/yyyy h:mm:ss tt"
     }
 
+    # en-GB
+    if ($Timestamp -match "\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}")
+    {
+        $script:TimestampFormat = "MM/dd/yyyy HH:mm:ss"
+    }
+
     $Results = [Collections.Generic.List[PSObject]]::new()
     ForEach($Record in $Data)
     {
@@ -526,7 +532,7 @@ if (Test-Path "$UserRegistrationDetails")
         $Results.Add($Line)
     }
 
-    $Results | Export-Csv -Path "$OUTPUT_FOLDER\CSV\UserRegistrationDetails.csv" -NoTypeInformation
+    $Results | Export-Csv -Path "$OUTPUT_FOLDER\CSV\UserRegistrationDetails.csv" -NoTypeInformation -Encoding UTF8
 }
 
 # XLSX
@@ -555,11 +561,11 @@ if (Test-Path "$OUTPUT_FOLDER\XLSX\UserRegistrationDetails.xlsx")
 
 #############################################################################################################################################################################################
 
-# Users capable of Azure Multi-Factor Authentication
+# Users capable of Entra Multi-Factor Authentication
 $Total = (Import-Csv -Path "$UserRegistrationDetails" -Delimiter "," | Select-Object Id | Measure-Object).Count
 $Count = (Import-Csv -Path "$UserRegistrationDetails" -Delimiter "," | Where-Object { $_.IsMfaCapable -eq "True" } | Measure-Object).Count
 $MFACapable = '{0:N0}' -f $Count
-Write-Output "[Info]  $MFACapable Users capable of Azure Multi-Factor Authentication ($Total)"
+Write-Output "[Info]  $MFACapable Users capable of Entra Multi-Factor Authentication ($Total)"
 
 # Users capable of Passwordless Authentication
 $Total = (Import-Csv -Path "$UserRegistrationDetails" -Delimiter "," | Select-Object Id | Measure-Object).Count
@@ -646,8 +652,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUgO+yBLwdokdIZI//+davi2U6
-# z36ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUzU1pX3oxv6A5pajWWNdxvjNf
+# IvGggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -849,33 +855,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBTki/ZaiTgm9FpKc4l7YgsmJzroJjANBgkqhkiG9w0B
-# AQEFAASCAgAWAnbf/KrfuoecWpKA3tIQJj+7b9qRonNksHWfckD66qzjJ2OSkU9d
-# CnXCqlO6huQX14CabwHjOsvP8f3Br7eAK9j193gWHqcIZCba+UUUa6YOnHh8SB/l
-# iMxcCVh+JrAwUE9ZKk3o1HBgInyz/jdksxIT4qCEvA7cUMyZdOuZqP2MtdbvQ+8Q
-# TFkkofMBf36qmq0fRLGgzljWa/nn0FyfT3Wl5z4HuojtfQ1pbEiN7NJ+/YYvZEHH
-# mjmbvwS8uFuH8PTuPUXLPI5iha0uvbjFdsnP5TmUzMC1Yt8c1kswICJXqB646VrG
-# iyph8nzYBEYW7Ne+V7zqYVXF3LJZ5cZbHJwRu47PBkTSQtcSMyk5cIpmvLX5uAqI
-# Yx3XX0QPKpM/Bk8je7dHkmnA6OKjBbAwqkoVj7GV2IZg0eRTwni89UWGrPkKYIeM
-# tJOmBPH8O8wUr50LvYR5T6yOUimmjIvfGJfArJPwXCaRN3q8Cunr/ID4LhPFskNH
-# zm/lcuhejlEA/CD2SnMTeEhIwdUl5UmK9A4ultnJsgb1hb9sFOrPiDIWEpnG+U+w
-# V9xhQg4oUcl6HuZiYKGMlrN2BCBG2wKONZgl3wz3DXKtENDf4HS4Jdy+0htL34aN
-# KIZjQVq45B4H21jd/IN2DW+iTaNwqlz8Te6bb7m0DQjRd2ZUFWOaR6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQ7iN1sDxGX/dvspaiW68kf/zT6wTANBgkqhkiG9w0B
+# AQEFAASCAgBv6k1fSPSR0NE3pi/vqRVISFEAKBkK5V060cwblYyYZy7pdByibW2u
+# tSIGGsWC9zgjhoHuVi+bT/zwAmViEO7aq19rUsZET+YMsMiZYLua2G05ch46zLkd
+# OFe2RtVwEC0I1RUI/yLUM6rSWfun9uKqjaNae6gubOBvxbvX5Ba+nuakzIXCoPAM
+# c66ZxKiYcahddvUnCMw6efTdilQNqbNcD9zMK9IiYxHTKGsZnZLwSAAl8xR4PoBh
+# TvjZtXRWiWHrBrTtFsgB8vnpxC6FQ5eAqG2M4zrdJc9Egu4zXU4lS4/Wrg+BmO5J
+# bQ7Fcm6c7sGlWzyeOOqffBhDrV1E8trHcq8zctk9MEvu4y/n+ayN96bAo1uGbHps
+# fcbWI6Qp9tdR3WGWOYKFTzeeV+2GHMBfCsv0lYPlM3AybsZbD9chUU0oE2OdM9RV
+# NGd6xhvHTSsZH5utwheA2expdnPuFwEPAUhfHID5Jvbpzj2q49f+Ow56uo2XavtA
+# H0V4+pAQXv52asWpjoWbHd5bKth6aEEogxa9a8BcJW42C9o2vCEj97ii06wPpGMC
+# VW8hDrKNdwYhA0AneD/FFGqqh+bkHFG79Hut/gPMfS6nciWDkdrPY0ZkxriMcNiq
+# 3iZRpQx8uBwhbFft8xhHIZhS8cWMKlAYFabxMaqj512oVygKCKQk66GCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDUxNTA0NDcxOFowPwYJKoZIhvcNAQkEMTIEMF5i/gT48kJrJb8PLBLHEnjbOBAI
-# DNC27yge7USyJhjiLutr4zpEEZ5aqhMP1cp7fTANBgkqhkiG9w0BAQEFAASCAgBs
-# EKfWerUyCBgH0Bhged0zP3pH3D983hqDrJcHsPlI9z4wMEsNUvqg3sKeB1ucwNY1
-# 9/F18qAnLXpLeSbizqCV8b28ZfnukooQGqrU1mJPEeuiwGjzTr1OkBHqv+CpWMqo
-# UJE/KACWv6RjFglBMNZttrocbQTu1+S42UtsQof1Xo/p5X+Il+grWWC+qInnpftg
-# S0j1/eJR1HaJ2icsiTDREhCR679ECYFGrjqOyV4dZr9R/kaZd+aUPsiGHT3Gadi3
-# edqTnwJAuAcNd6k+81omfPoDzoMfIPxctAvkG6crsyIoGH5Q0GinsMAFM43uVYXA
-# Y7BA2Vtl70pT8KV+ldf2Zdt8uEu8VASl78UBadUSNjPObjXXADWS5uYD0NtS0tdU
-# PWN3U9+LWa9Q/3w+8pMENMeF/RLUuMrxUTT/Vn/+cueMcsML1SlH93ZTqAh4yoKT
-# UBhysEBljuZOiuCvON6E7gaw+aw7UHnwr+pXEmpVCNpV7JsspDC1D7pO2iaZLXR9
-# dLA2FtKS4VM/eN+zpduICE4hbGV24cS5FvBnIGoj+SgBjniPbrbBHn+0H7DL6/jp
-# aFHWthQiW+JxsaJm//w1Dr2PGOVp20yNqsmm5nEv/43SSSjYsM1J4CUYV7qGhNTV
-# HeOAk+3wM/MEN9CdQ50jS+H0fYHrhu+CBK7FK0C3Yg==
+# MDYwMzA3NDU0OFowPwYJKoZIhvcNAQkEMTIEMG4N8ZmzXLh34iFwNr1QD0GzVDK0
+# QBKcShrToi6ep4jpGwCMrHHkmbJTibNeqmlC7zANBgkqhkiG9w0BAQEFAASCAgBo
+# Qg/i4iDXmD/fTrqorXpWWELCC4zCMFm8ZUCUYeWKTTbcESxfVc/MfHcgrfvgyrSu
+# QRQuD7AZ7L3foKumr/rcb/PHD0m6otX4Nj/xsrq+AJNayiq/uYYR4nTrlVLUN+Qm
+# MX5WP+GpNVj9sZdS+vmjWEckvIpDVYX6tIY+dd1lPfCSiy4DXy885aUEPxtOpwRT
+# QTXR0pEuLu34fwBbk4OJlO72I/jsV6KrJZkyCr8k6kCXEnBFaj/PVWN/dkDiLjeJ
+# qdvQ7Ewqjg/uLWzspUWpIYqFpxYitJGexkTgQFeRvvxBw9z8E0Mp/DoZULwiuJb2
+# NsacAu9LvMiQBZqYMoGyBzMvuI/WEXVgPgOf8H5h8y13uBwtA1SE2+yGHzw+MidA
+# Htrf2SesJxWsFQukzRj9Hqb2kxVqJx/Ku+NWP9PAPkI9cu2UCHWutxAgCBhkFD0O
+# XPnWJs7j995RSkC1kiXxV+K34spqzqRvFzyCh0WoJvuMElL59LMW0YLgggNipnjM
+# I3bP5QEFxoLVmcAKP15tmOsS8+JoHrS33gTbjWS1l8QTBgq0Bg3JLOKJ1XUXJsvg
+# URnH0QvLNeWuVedbl7lsZXDupLONonjkpsJNX3+dwZBbGIbiInfZ8Wv6ngZKnODo
+# AehsQ5iwNLsCbFTAYrw1vULtOVP2jA1UGdVAJjy75A==
 # SIG # End signature block

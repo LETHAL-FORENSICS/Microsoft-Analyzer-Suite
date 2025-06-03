@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-05-15
+# @date:      2025-06-03
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 5.1 (5.1.19041.5737)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
 #
 #
 #############################################################################################################################################################################################
@@ -35,9 +35,9 @@
 .DESCRIPTION
   OAuthPermissions-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of M365 OAuth Permissions extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.3)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
 
-  https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/OAuthPermissions.html
+  https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/OAuthPermissions.html#id2
 
   List delegated permissions (OAuth2PermissionGrants) and application permissions (AppRoleAssignments).
 
@@ -377,7 +377,7 @@ ForEach($Record in $Data)
     $SignInAudience = ($Record | Select-Object @{Name='SignInAudience';Expression={if($_.SignInAudience){$_.SignInAudience}else{'N/A'}}}).SignInAudience
 
     $Line = [PSCustomObject]@{
-    "CreatedDateTime"        = $Record | Select-Object -ExpandProperty CreationTimestamp | ForEach-Object {$_ -replace 'T',' '} | ForEach-Object {$_ -replace 'Z'} # The time when the app role assignment was created. The Timestamp type represents date and time information using ISO 8601 format and is always in UTC time.
+    "CreatedDateTime"        = $Record | Select-Object -ExpandProperty CreatedDateTime | ForEach-Object {$_ -replace 'T',' '} | ForEach-Object {$_ -replace 'Z'} # The time when the app role assignment was created. The Timestamp type represents date and time information using ISO 8601 format and is always in UTC time.
     "PermissionType"         = $Record.PermissionType # Delegated access (access on behalf of a user) or App-only access (Access without a user) 
     "AppDisplayName"         = $Record.AppDisplayName # The display name exposed by the associated application.
     "AppId"                  = $Record.AppId # The unique identifier for the associated application.
@@ -408,8 +408,6 @@ ForEach($Record in $Data)
 
     $Results.Add($Line)
 }
-
-# "PermissionType","AppId","ClientDisplayName","ClientObjectId","ResourceDisplayName","ResourceObjectId","Permission","ConsentType","PrincipalObjectId","Homepage","PublisherName","ReplyUrls","ExpiryTime","PrincipalDisplayName","IsEnabled","Description","CreationTimestamp"
 
 $Results | Export-Csv -Path "$OUTPUT_FOLDER\OAuthPermissions\OAuthPermissions.csv" -NoTypeInformation -Encoding UTF8
 
@@ -1228,6 +1226,14 @@ if ($Count -gt 0)
     Write-Output "[Info]  $Count App Registration Date(s) found ($Apps)"
 }
 
+# Line Charts
+New-Item "$OUTPUT_FOLDER\OAuthPermissions\Stats\LineCharts" -ItemType Directory -Force | Out-Null
+
+# OAuth App Registrations (Line Chart) --> OAuth App Registrations per day
+$Import = $Data | Group-Object{($_.CreatedDateTime -split "\s+")[0]} | Select-Object Count,@{Name='CreatedDateTime'; Expression={ $_.Values[0] }} | Sort-Object { $_.CreatedDateTime -as [datetime] }
+$ChartDefinition = New-ExcelChartDefinition -XRange CreatedDateTime -YRange Count -Title "App Registrations" -ChartType Line -NoLegend -Width 1200
+$Import | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\LineCharts\App Registrations.xlsx" -Append -WorksheetName "Line Chart" -AutoNameRange -ExcelChartDefinition $ChartDefinition
+
 }
 
 Start-Processing
@@ -1276,8 +1282,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU8ZSXfCXImFSpDRl5bUpUWxZz
-# JnaggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU80xh/X2kjIAXKjsvobxZkpdF
+# idaggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -1479,33 +1485,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBR+zBw0RFRI7SymiT/G6o42cyCHvzANBgkqhkiG9w0B
-# AQEFAASCAgAJfx+vUmv+/i3I7tXGzZGX5ERsQCaSZnMp06UU9v9VPPBSWpNDQbsu
-# HxLDNw8VFd0iQtaRlE+3pUnjA9t+jArr1U5bqPj6x4QxWShYDNOC+RQfSl73dkYp
-# bdgrycV4Ilbf+stMLX0yNAurUPKuS08/LZClhtyK1aGzh9Npkaz9p6L1oQZ0Sr5R
-# iaa49N91JyXgOx0wtgz5laP0FDvlVnS+iCpNDo8WPGimYeiqkSdpIeG4zcGW8FwZ
-# 3zLw8Sf8xBkpmlrdmPvBhjOfoA872SJQZxbRyyvCmlf6vgcTObEX1Dzh1DBbpWg5
-# IIg9ujl5EOAvkiz7uC0KRV0lPVXLf3YX5fbz5xHCyxUTtqKYYWxzOY5XOlXEWDAh
-# 7m+Ypp0yQR1horMndD68Q2GrBb6JTWXn+UjVgxP5KJAD+0TbPy8Q5ofbfSJocSCP
-# 6NJeRWQ+oaPdJ7H+QujKAAGjJXHewTztS2C/JAnB3slT5h9s8sDUnMpOpDBIiYPg
-# KroFa8RJ/Lw0ot/0bp+MbdqPYFcdaxxzBaWDdXenunjOchwuXgloiDxxbTKm+XaD
-# cr+3m8LP1gXLDVqFaUhDgxEBPIUR9ixjHjqvoFNxMHmzsHDmDO6/RspNMZOKpjjG
-# qSbzH5hsHw9rSErd9wXdVJO7eE6IeZXia6JuaN2p+tdADWhmSMiqQaGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQpM7tOW6Jk2QdreYaXuBEcFov9tTANBgkqhkiG9w0B
+# AQEFAASCAgCGLoGfUmeaxISrbAlw8eCKKx+82WJaUijkMlGNA89IabeknIFK0mi7
+# Vr5WZBvjCLcoA28ebWHHvGEo5Iu3ylaiqk0npqRl7D8VyK9rZH08KRjqzJZ51IZu
+# og2D6f2MTHUoGYGbTKwSY0VWO+oTPm52/aQnRjiUBELMJWkNhmtUrVgx2uKmns2+
+# KPD+/HADQXhNms2O+xrTXgSm68WQ8Fygo0WPL1BP4XanuUf1SFVQvv5euH7ohtTm
+# TPl3UdLQy/i0n2/b1r9AXMT7HM9u5N1RyUAPgUiWcjMVdU6eQSGShUKKzUuR+XZe
+# dRVNs8/0yRJQpCz1v51edOnvXrqf8fyR0MWUZ3a0XbH2acAffN8Jmzpg2QlIeZKD
+# kl2WD1qLcjahXzjbZV6npHnWZ1ei/J7bg2puSuz/ccrWkL2S1I9NRUJNYYroCiC7
+# HUi5mkQoIGZNWHPl4Bi5tWgkuXp4VHxwXsrj7V8AO0ZeVStdNtsIX9KRhS2RPAqE
+# 9vflcc5FZPbUR8ipfQVRI5iQGW9xMrVmFwxiD1XQF70VWAZkngR37atV6ykwowl9
+# y6+SU++nWHQ2EYJc7yCQzTU1wDy7Ga4MFFakInUlMVeCVf+C6ZiZ0s3X7z9w7fMu
+# hzeAn9fYN3IbWn1uys1nIl1bxkVOiQZQ8ldFX2Uwk1SYALGMr52WZaGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDUxNTA0NDcyNFowPwYJKoZIhvcNAQkEMTIEMNLnZTNQGbtehg9zJKOL4lphvNyi
-# zKBEKKeSDH0n7cFwxNtGaSpeZxgWh2MV4f7XnzANBgkqhkiG9w0BAQEFAASCAgCu
-# 9Z2FoEAAbo5qsT50ccTZED5lnqbpSjy7Bl753gA+B3ZPqGtM/d2ABMny4AFaAB+9
-# 5Y0RBmhA2FGleBW3dmOiv5ilFxF9DMex0AdG2lMbE7cQSZWX/ncRxO7q17R7Hsx4
-# LATYM5WBYzqDLkuBPmC4cu/vRnh260WkwOEBvxAczVotLyP17PYBr5fMFeX6FBku
-# Cqs66rElclIFNFd52sRNwLOHWxQHZITgdOpLnffrmGraKeKgVCyfNXmUOA6LQ5Qh
-# gT873crxp/SLsVRzj3hl7YbZtgYC+ZJ6rXJQHMCCBhZSyHSFZfl/jGJp7h16hqd9
-# 8+gXU1TNL2FrWd0+E7nX4Ha9ojIbgtCYzOxyeZceb2ej23QCHHZnQruF5uhsdRao
-# adK2FDzJZjFvAaae4BRCEGJT3GSEWSZRm5GlcpIwhiO2lIFt/IFPs7QDbx3x1iyQ
-# 2OcOva/KtMhj3rsJlp9Qb9HXVeEpZdkLFQXCKIC6PjsNGM8ym6iqJFMo9mpJfpfQ
-# XAz4to5X4sjhUt++zAo04qwZViQkDASAWmzzo6yyRfTPC7Hzgffc6la4/L9EN26y
-# ll9RQ+I8zUx+X2mW5CHUeALRNKBa/UslGUQB/rhgmfpPzT55Loj/FPnlITksbcij
-# uDKRNKKQugxfxRUBuym0AsLMfjW36EJUxwBaheuH0g==
+# MDYwMzA3NDU1NVowPwYJKoZIhvcNAQkEMTIEMHknpK9AHbBdX3IkCpdxEOJOVZ81
+# BzqaCL8yiy8Roizv/dDq1e+BKT6b1INENEEP3TANBgkqhkiG9w0BAQEFAASCAgBX
+# lBgNYbNzOoDENubn0GFXyr8a7eo8ds/zBsxT7AoU/GkJd0y8KxM2Kw6n03H12M+7
+# RACTVHJ6BjY24VGYpWqE1aRG5gokE8w/MwgycBa/mjFvKG8DoiTZ3+L5F6hqHYot
+# if1JyTM6ZUl68rA37Nd1EsxrfrWB46wTr/kUiDPu2nNYo10nUZ6jYah1uVJg+siG
+# Gj44qXVCsr5XsO5nWJNsSKr380js7HklClTHdqfu92QTe7sdHUhiDIcWHiDOKhN8
+# hyQn9Zfj9BTDgRWXsqie8bgUip499oMVY7nQ46n03ht7XAE84NCz6RiJcm0fJtGN
+# 2yqRn3Pp/DOcLk/T38Fc5QnBAqSheo8jLauDNlO4B8PzjPkevUnqUa3lhWkPBqfz
+# W9ETQX8X7br1e4Wb/O+uM/c3BLCF3kxAcE16popUb116HpahkpaJ2vqUkJCtRssz
+# VsZDVoS4/xIVJEv2RIxiVAaZKSgSTxXLMwZIrsDl0ncjCJG3ylq0+rtiRw2uVW08
+# Cj/AZLz+3Que5HGIYAvZ8PkOfQW2RztuTKOTwiGKhye+CJxeEhMORnhMNGzTfoAC
+# g42N6B3/4/QFE0tv4eKjHlzVhhW8WDIvdqF6T5DbIS/lC6Vy23arYroRLnkdKxeO
+# Bz2AVGfjHZQvcpT38YUy56WAP0fTCHtSY5HL9Z5IHg==
 # SIG # End signature block

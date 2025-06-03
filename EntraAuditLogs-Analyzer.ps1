@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-05-15
+# @date:      2025-06-03
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 5.1 (5.1.19041.5737)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5737) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
 #
 #
 #############################################################################################################################################################################################
@@ -39,7 +39,7 @@
 .DESCRIPTION
   EntraAuditLogs-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of Microsoft Entra ID Audit Logs extracted via "Microsoft Extractor Suite" by Invictus-IR.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.3)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/AzureActiveDirectoryAuditLog.html
 
@@ -385,8 +385,8 @@ Write-Output "[Info]  Total Lines: $Rows"
 # Time Frame
 $Last  = ($Data | Sort-Object { $_.activityDateTime -as [datetime] } -Descending | Select-Object -Last 1).activityDateTime
 $First = ($Data | Sort-Object { $_.activityDateTime -as [datetime] } -Descending | Select-Object -First 1).activityDateTime
-$StartDate = (Get-Date $Last).ToString("yyyy-MM-dd HH:mm:ss")
-$EndDate = (Get-Date $First).ToString("yyyy-MM-dd HH:mm:ss")
+$StartDate = (Get-Date $Last).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+$EndDate = (Get-Date $First).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
 Write-Output "[Info]  Log data from $StartDate UTC until $EndDate UTC"
 
 # Processing Microsoft Entra ID Audit Log
@@ -417,7 +417,7 @@ ForEach($Record in $Data)
     $ActivityDateTime = $Record | Select-Object -ExpandProperty activityDateTime
 
     $Line = [PSCustomObject]@{
-    "ActivityDateTime"          = (Get-Date $ActivityDateTime).ToString("yyyy-MM-dd HH:mm:ss.fff") # Indicates the date and time the activity was performed. The Timestamp type is always in UTC time.
+    "ActivityDateTime"          = (Get-Date $ActivityDateTime).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.fff") # Indicates the date and time the activity was performed. The Timestamp type is always in UTC time.
     "InitiatedBy (UPN)"         = ($Record | Select-Object -ExpandProperty initiatedBy | Select-Object -ExpandProperty $ActorType | Select-Object userPrincipalName).userPrincipalName # The userPrincipalName attribute of the user.
     "TargetResources (UPN)"     = ($Record | Select-Object -ExpandProperty targetResources | Select-Object userPrincipalName | Select-Object -Index 0).userPrincipalName # When type is set to User, this includes the user name that initiated the action; null for other types.
     "UserId"                    = ($Record | Select-Object -ExpandProperty initiatedBy | Select-Object -ExpandProperty $ActorType | Select-Object id).id # Unique identifier for the identity.
@@ -758,7 +758,7 @@ if ($Total -ge "1")
 New-Item "$OUTPUT_FOLDER\EntraAuditLogs\Stats\LineCharts" -ItemType Directory -Force | Out-Null
 
 # ActivityDisplayName --> Activity
-$Import = Import-Csv -Path "$OUTPUT_FOLDER\EntraAuditLogs\CSV\Untouched.csv" -Delimiter "," -Encoding UTF8 | Select-Object @{Name="ActivityDateTime";Expression={((Get-Date $_.ActivityDateTime).ToString("yyyy-MM-dd"))}},ActivityDisplayName | Group-Object{($_.ActivityDateTime)} | Select-Object Count,@{Name='ActivityDateTime'; Expression={ $_.Values[0] }} | Sort-Object { $_.ActivityDateTime -as [datetime] }
+$Import = Import-Csv -Path "$OUTPUT_FOLDER\EntraAuditLogs\CSV\Untouched.csv" -Delimiter "," -Encoding UTF8 | Select-Object @{Name="ActivityDateTime";Expression={((Get-Date $_.ActivityDateTime).ToUniversalTime().ToString("yyyy-MM-dd"))}},ActivityDisplayName | Group-Object{($_.ActivityDateTime)} | Select-Object Count,@{Name='ActivityDateTime'; Expression={ $_.Values[0] }} | Sort-Object { $_.ActivityDateTime -as [datetime] }
 $ChartDefinition = New-ExcelChartDefinition -XRange ActivityDateTime -YRange Count -Title "Activity" -ChartType Line -NoLegend -Width 1200
 $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraAuditLogs\Stats\LineCharts\Activity.xlsx" -Append -WorksheetName "Line Chart" -AutoNameRange -ExcelChartDefinition $ChartDefinition
 
@@ -2252,8 +2252,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUVyy1Mmsb+Q0AFWRGiZ5hvJAp
-# d5eggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQULbiZMVFmXPArRhBKOiH2c2d9
+# 15aggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -2455,33 +2455,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBSsNao3xY30Zynpptv95PNFdO2C3zANBgkqhkiG9w0B
-# AQEFAASCAgCqp1JCsdKyeWTJOK6S4vBSaaTW5uvMgTmX/sNiupGHX9dSd973rWrC
-# FxoQjAWqIbtXGN4Q1Ymq9Pq9MYjgr89zbl5o5F8+UdlQC6LM/1t/bX4gj4anVhAL
-# xOnU0qzPoaW72q6fi1knYWLwO5ijRodPSZIxMFpWYm07mZOAsEI1XCiAYTYwoE+Y
-# wy6wMrG8iKGYLulR+HnvUjwHkguSaHyJauK4G4bOqisqB1y03vKZ0qNPUkd0a7Pm
-# 3oD2yKoFWV6nqkcKf/eerehOaG8ZA5dWnkgd0FeIE32wECHo9BO5OV8r3FlUhFu3
-# EghaTQJAJVjvypPm6EOikndwwqFPl+BQK+b8BtAHLz71WiZGOMJ+8vtC2KeMQAnQ
-# An6MrWY5RnVMyZjW3QxbWgn3dEScrUiX18OlQsGVLYpADSCLnqnYdJ49EmaGoteq
-# ZhY1FVgFqqHgtylrCUQ+w/GCdWoLvyLIZmzvwTp4p5wRQfzJM5Dcud3r4vxt/GLs
-# PgC2cXu1mA5TEwfkoXQlrROcbGZjwnb2yJF8TDP8NzbmKiztsNFOtOvtTN3z7/UP
-# f4b0Z7Qz7e6ZhGc+ZEMD9SI2XsHurEAb4SL4p1otPDk+By1s5pex6mDpAWVaj0LI
-# HjLAkUeABsV8+3Q210HiSkBUH7GCcY0FFmy+Y4LIu5pRg8zzrObIq6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBSMacbMCUXou+xfVVqvY3DSPRV6dTANBgkqhkiG9w0B
+# AQEFAASCAgCYXodlNRkb4ZXUCcYb+dOfXUmGbHHDg8wxyWYLqpuZH13PJ/Sjt/Aw
+# 7MA/N5debgiKyqGDiIjYwAAIBmUHIw+IkjNddPNRypMJtyV9Ok4lG7qX3I5cd8Em
+# BqcIExbc8N1CwQpeCV6GeR9Ti8M26t6IWSD5kAJwwtruZ1+pdxMgsLITPjygA8K0
+# KzcfY61F652IrxHlNjaXQXmVMeYDA0tLkPmw/uygcEW4RrKBm13rxuq83VsGLwcN
+# pnbxIJvdSN0JQAiAzfGQi50u49yKSxYUUDuJC6LQRvQq0XMcV7BBZD8ltTLHfY3V
+# AS9gkuYeamsfTZSJG2Z/EwfWC86TGsTj7wW6PzDRuwm/l2svARJaMjjtjxFj0EnU
+# G+gZsm6XsHcCgfFj3AD/IJ38xSGWppnedmybw5UZHbWdXANkXdhJUT78xFnTB/ap
+# bHjieW6mphfs4866zzBmldkerf2JXhDxuVlwCvxFqd0pOA7K7AEIxTlPnNBYUnbN
+# xYEQeYm2Vdl/RrX9/bI+SB/c0jQtEOd+GmbquTrEtXJ56EtsNPsR2VPvI8FxkGfg
+# hSqmz8uRGbTUCOaxT6BqTD/S2f8LRa3WQ3zTbRIbcM4tiZgFeOzg8h3/MJCsbwqq
+# W777l6hZfiqFsmxcyVoDIDJZdHLQVJLIo8YvB2XMbZHoyOyqyfTwNqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDUxNTA0NDcwNVowPwYJKoZIhvcNAQkEMTIEMAaAARZv/lqW8Wyy5a6ShDuiHtSi
-# lt+jUg56vApDSlcFvG8Gx5EjaR4U+vYqyVjN+zANBgkqhkiG9w0BAQEFAASCAgA4
-# fvk8uq5V3iF/DDj/N28ZvYIHciCYTcLWI00QSdZ3uUNDNg+L2kVAOFRfC2ns5AQR
-# u1TBuKaXneLK50e4HPXuqQ+8DwN9rjyn6MvdtX6U5ZW9XMX8fGwLUtyqgtHTWurZ
-# NUcwJwA7XLxqLFVWRJNhXFhYs24XTrCouG+nGPETkKmqcdUCrteDSlAGkEEYLP9y
-# viQy57V5Ag25CQUzvwC+sd45sQ0zYJonb59qW35YJUxB1jTwFO4GaIk3QsVcTViY
-# HI6vIBdcyitcJXuww1jxecPxhXExBbIfdFkASkwLIq5yf0lwbVynln2fYtMke9Zc
-# 8qZeQP1o6L2BUN/z6q2EjHNdsI9gBy9pa+0VuV0hM6nF7ZHslvOqXpjYf1pPlDyJ
-# 5BTL5eRSoYMuC0xDyWykzi98LLF5ELUrQK9rHPfIeyHeINegygMvHm02VgmPBsZi
-# qiT85PU5wModp018n1WUY1kmHPvMSYOJpZLjoLz+skdd1AaZrEWVtXXNFNw0O0rK
-# M+ujMDsp2c1hVP0FunfFymjqMzjzsD/wfsGbWIvVKRaD8l5qrb88AbGke7CEi23F
-# EHZ/B4maMAlY9AE1upsG/mmLkWimFEDlyIzQzg5d4imMpOY/OuX9fjNUWMvRy7QM
-# fq6BF6RS4ZTpq7NNwHd/2h5ZkKUc4nalFZ3M1J2hMw==
+# MDYwMzA3NDUzNVowPwYJKoZIhvcNAQkEMTIEMIPSULrzxr6B9qtBi+JYd2SlEG9B
+# vzQoB2ZciZ2cF8riBVrX3pEk/8L0soVlH3tiMTANBgkqhkiG9w0BAQEFAASCAgDQ
+# +M7uXD4kVQLJVz/HmNgmEqbZoQrZ8ztczkzeVsYL7yVf/PPxA1rMl0YRvRCID4eL
+# cH2j0fHsdDQbmSNkgJzH91jcmlVBwX6t+MIO1Vt+3Ys1iSc+Ed97vadXyscgBZuA
+# XzcBd0nZjqZkc5zlkZnuTsq/ZA8v100K39mpawJ11aBi9MtbHVaxEA6PJij8pefh
+# bygXkW6m5522ZnWf9tIFHDAY6TgzOuDA6hsBOfUmbBzX3ecY/0RXt3FdrX3Sy+Nc
+# gdtym4lt1rSH2QT5hjlvPd6BVVW6doEUb4urvfY1NZ5UeqI0Kb3nqYDFHdXLxPyx
+# b8dSFtynM6uPIYT8ExeeW7KU81xRbL47IMrQb3RqBtft5D8AIL5nNoSBk6bwwQea
+# QjvMR5Eo2jDA8m2Gh+OrHp1ZWI60haYQM7+CxgGVBhEDUFgM/PRpgX50AZu64PxG
+# AoU78HBe8Y2MzmT6J2jKFs2pGSw+IsJRkPoNyhVFiGnmAZVB/QK+voWItH31jx8n
+# JWo0Yu0e75pnbwa+KVupXhCvQKB675kOL2kBzG3i1Rb+oo7SXPv+BhwCQz+ZllBK
+# +Deyk3gUcm+yprkVYl3klpLVqRQclCk8Md7QiXAL40ohm/4VhWNjVSf3t33+QrpU
+# bTJXKBtxiwnKyRzz7fPHLEOnkHJWKPVgrcbso8gS8g==
 # SIG # End signature block

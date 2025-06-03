@@ -778,6 +778,12 @@ if ($PSVersionTable.PSVersion.Major -eq "7")
 
 }
 
+# PowerShell v7
+# Update-PSResource Az
+# Update-PSResource Az -Repository 'PSGallery' -TrustRepository
+
+# Set-PSResourceRepository -Name PSGallery -Trusted
+
 #############################################################################################################################################################################################
 
 Function Get-AzureADPreview {
