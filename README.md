@@ -70,9 +70,6 @@ Note: If your change is larger, or adds a feature, please contact us beforehand 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.  
 
-## Related Projects
-[MAES-Platform: The M365 Analyzer & Extractor Suite](https://github.com/ionsec/maes-platform)  
-
 ## Links  
 [Microsoft-Extractor-Suite by Invictus-IR](https://github.com/invictus-ir/Microsoft-Extractor-Suite)  
 [Microsoft-Extractor-Suite Documentation](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/)  
