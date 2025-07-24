@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -270,32 +270,22 @@ Write-Output "[Info]  Processing RiskyUsers.csv ..."
 New-Item "$OUTPUT_FOLDER\CSV" -ItemType Directory -Force | Out-Null
 New-Item "$OUTPUT_FOLDER\XLSX" -ItemType Directory -Force | Out-Null
 
-# Check Timestamp Format
-$Timestamp = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object RiskLastUpdatedDateTime -First 1).RiskLastUpdatedDateTime
-
-# de-DE
-if ($Timestamp -match "\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}")
-{
-    $script:TimestampFormat = "dd.MM.yyyy HH:mm:ss"
-}
-
-# en-US
-if ($Timestamp -match "\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} (AM|PM)")
-{
-    $script:TimestampFormat = "M/d/yyyy h:mm:ss tt"
-}
+# Import CSV
+$Data = Import-Csv -Path "$LogFile" -Delimiter "," | Sort-Object { $_.RiskLastUpdatedDateTime -as [datetime] } -Descending
 
 # Time Frame
-$StartDate = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={([DateTime]::ParseExact($_.RiskLastUpdatedDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}} | Sort-Object { $_.RiskLastUpdatedDateTime -as [datetime] } -Descending | Select-Object -Last 1).RiskLastUpdatedDateTime
-$EndDate = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={([DateTime]::ParseExact($_.RiskLastUpdatedDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}} | Sort-Object { $_.RiskLastUpdatedDateTime -as [datetime] } -Descending | Select-Object -First 1).RiskLastUpdatedDateTime
+$Last  = ($Data | Select-Object -Last 1).RiskLastUpdatedDateTime
+$First = ($Data | Select-Object -First 1).RiskLastUpdatedDateTime
+$StartDate = (Get-Date $Last).ToString("yyyy-MM-dd HH:mm:ss")
+$EndDate = (Get-Date $First).ToString("yyyy-MM-dd HH:mm:ss")
 Write-Output "[Info]  Log data from $StartDate UTC until $EndDate UTC"
 
 # XLSX
 if (Test-Path "$LogFile")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$LogFile"))))
+    if(Test-Csv -Path "$LogFile" -MaxLines 2)
     {
-        $IMPORT = Import-Csv "$LogFile" -Delimiter "," | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={([DateTime]::ParseExact($_.RiskLastUpdatedDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}},Id,UserDisplayName,UserPrincipalName,RiskDetail,RiskLevel,RiskState,IsDeleted,IsProcessing,History | Sort-Object { $_.RiskLastUpdatedDateTime -as [datetime] } -Descending
+        $IMPORT = Import-Csv "$LogFile" -Delimiter "," | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={(Get-Date $_.RiskLastUpdatedDateTime).ToString("yyyy-MM-dd HH:mm:ss")}},Id,UserDisplayName,UserPrincipalName,RiskDetail,RiskLevel,RiskState,IsDeleted,IsProcessing,History | Sort-Object { $_.RiskLastUpdatedDateTime -as [datetime] } -Descending
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\XLSX\RiskyUsers.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Risky Users" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
@@ -364,7 +354,7 @@ Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Group-Object RiskDet
 # XLSX
 if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskDetail.csv")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$OUTPUT_FOLDER\Stats\CSV\RiskDetail.csv"))))
+    if(Test-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskDetail.csv" -MaxLines 2)
     {
         $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskDetail.csv" -Delimiter ","
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskDetail.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskDetail" -CellStyleSB {
@@ -385,7 +375,7 @@ Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Group-Object RiskLev
 # XLSX
 if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskLevel.csv")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$OUTPUT_FOLDER\Stats\CSV\RiskLevel.csv"))))
+    if(Test-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskLevel.csv" -MaxLines 2)
     {
         $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskLevel.csv" -Delimiter ","
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskLevel.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskLevel" -CellStyleSB {
@@ -421,7 +411,7 @@ Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Group-Object RiskSta
 # XLSX
 if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv")
 {
-    if(!([String]::IsNullOrWhiteSpace((Get-Content "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv"))))
+    if(Test-Csv -Path "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv" -MaxLines 2)
     {
         $IMPORT = Import-Csv "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv" -Delimiter ","
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\RiskState.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskState" -CellStyleSB {
@@ -441,7 +431,7 @@ if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\RiskState.csv")
 New-Item "$OUTPUT_FOLDER\Stats\XLSX\LineCharts" -ItemType Directory -Force | Out-Null
 
 # Risky Users (Line Chart) --> Risky Users per day
-$Import = Import-Csv "$LogFile" -Delimiter "," | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={([DateTime]::ParseExact($_.RiskLastUpdatedDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}}
+$Import = Import-Csv "$LogFile" -Delimiter "," | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={(Get-Date $_.RiskLastUpdatedDateTime).ToString("yyyy-MM-dd HH:mm:ss")}}
 $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 if ($Count -gt 0)
 {
@@ -452,7 +442,7 @@ if ($Count -gt 0)
 
 # Risky Users (Line Chart) --> Risky Users per day (Last 90 days)
 $Date = (Get-Date).AddDays(-90)
-$Import = Import-Csv "$LogFile" -Delimiter "," | Where-Object -FilterScript {[DateTime]::Parse($_.RiskLastUpdatedDateTime) -gt $Date} | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={([DateTime]::ParseExact($_.RiskLastUpdatedDateTime, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}}
+$Import = Import-Csv "$LogFile" -Delimiter "," | Where-Object -FilterScript {[DateTime]::Parse($_.RiskLastUpdatedDateTime) -gt $Date} | Select-Object @{Name="RiskLastUpdatedDateTime";Expression={(Get-Date $_.RiskLastUpdatedDateTime).ToString("yyyy-MM-dd HH:mm:ss")}}
 $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
 if ($Count -gt 0)
 {
@@ -507,7 +497,7 @@ Write-Output "$ElapsedTime"
 # Stop logging
 Write-Host ""
 Stop-Transcript
-Start-Sleep 2
+Start-Sleep 0.5
 
 # Reset Windows Title
 $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -520,8 +510,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUHgGZMyOicZLODtqzL2fUDg0H
-# RF6ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUaFSF74wHNXnRHjsU7VSrwdyV
+# I1mggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -723,33 +713,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBTQ9xP0Y0wXCQWbIH9C2v3PBecT5jANBgkqhkiG9w0B
-# AQEFAASCAgCclZ+f2H88WTDgU+Tqku45ZeKPcbt3ncY7HUiE2vsaWos6rmv/F/j7
-# bktwW8OLUK3X/ZAN9yHwP5ZtqojId45Jm1h06FaurtdWpgjM4MqqD4pjUx+jvfgV
-# oiGVKO5eSxtlgq46sDwvXFzCykkM2tzdRZGVBIQtzSj8JU3cnC8YhAGXyJmdPlQS
-# Ppqij6JvydS7WLBgwrRJh24HJAFM02Wrl69DCsJ9Hr6aZSAXojxvUpS/VLB/Nd+Z
-# f/fTcCNftLxk7dHaVzFaWTpST7IslW32mdQgtofaoCyeQ4pCbZ7FGpDq80nrdL0A
-# 5K/qn0OVzvX8Si33LcWGayr+JfIvK82pBTe3I/VRjr0i+G/MaUAVriqa5K9qNQ94
-# 6/PtMtClIb/l9SZyl0yHNMc/WgasoyLXyNgfg4l7ZpKVEuDHZKUtPnNHAw7tA3sg
-# mRUEHPkVsOp3PB9aVUnB7OM+inSD3/fTXDpk7PhX/XQfsZusUJJvhJTVgwpVB6mO
-# fDah35udDyME08EIV2zG42oLrxHrIYi3T1/DIO9h5/gmRHMswLyXSIddi+kKWjrd
-# 0O8Tj0fSy49yGnmovVKVp0MoHlbgcpZN4SYd/6mRU+txW6KG4U9gG6gOqpHTow3B
-# VmGuFAqKDue/yCixIblxV9hdpYJvk47bxojTYFVCSv4aEU2UDzZZCaGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTQ32BhH355x7Jvv/TwTWuZa+qMFjANBgkqhkiG9w0B
+# AQEFAASCAgAm2S+QmR1cA9/rrGMT936Xq2uGWEwuI6te6iNXCxeXavirMaAeYW0m
+# m02VNfmkguKN1XA84bQRrKFreebJGcpxuCSMleKF3l55VpVfdOsO7IRUcjoj8oFQ
+# 7Qhf+mNgqnBkY+xa62TcHRoY6JSzxJ42TODrQ3ZICJbW/2Cw0Vqhh4NfrwucB1oC
+# DTLVkrIWiVcTfNEq2T43TTVqIEHI0y2HTQgNVTgdkAL7m6VegJ4XkT+UWVc4rkdj
+# Kmtw8qliqfNxT7Nkgw1RA74QkOQQUUIAAMXJVReNbNjSXvn9H5B8WlutK4xgy2j1
+# LiU+cGKNVwAnUD14ygmiDWk2dJNfjxTPs42bvWvQLuEKLjkFdvYsbwpgINLUvatK
+# /RPOqm17A7GYxUyfIQJ9PTKX8JNK0n4DyiQZecU5UylCB2iyVn4lNhZJcNvstONO
+# tLwSL3KUqaYAk1yah1EAp9YlZRIMtxrrlIyl0KQ0+IjJr17ORFQfbZdI0rNaQ/7w
+# /nhxkM7SQdevTtfjggat2Rhfapkdju6uRmK5Ixcl0HoVh0Os31bCOdk8gKXtb+3X
+# f1XC2xgU1VJI4XeRrIwS8+Ovqd+WOSVp5toVCoFBKbYK/mH/Yl3Zz2LLXOmpt1qU
+# hE6wYMQXe8UKHoyJ6T37XGx6I2A4M89xvVId8Rvyh6nBEUfQuRvVDqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDYwMlowPwYJKoZIhvcNAQkEMTIEMHteQe2mWkOHIHtaqSzx3KlU6m8h
-# chF3usNbVB01OAYs+WNmA0Ol6r0rKG0RdcIfOjANBgkqhkiG9w0BAQEFAASCAgC1
-# J4mi8WKSsS0TghIUTKCKbfNLvUpBLBpjXfmzp8vaPWFOQaVfARE7hQX7o+6nagT7
-# T33aHiiOIn9CisJEIl38zAb/QrAVIToHNeB0sgW3LTxRbiJkc3cEBZ0ALx9n5O0Y
-# l/9/2DO+wqrsQPNuHaNm8AieVXO92PZEZ++UdUa4cTDy4W9HJ4EaajeOxnFySrnE
-# aP5BX66QJFu9dkVB/pMTJD38f36HiCNunwmH4BiuPyuHPA0WCo9qwmPcCXlfQPwo
-# r2xlSKSr/I82P2HzS0rv+CCv5ncUOH3v1Ig93TtxAuxG0gCaydTjHpzN4WGp3/rN
-# vRvlh9s2X3RH6xUlDkOL97SOC5oaAb5X3mEIDy7r33BCQa6z7RcD3CvUDwnEjzie
-# wSlMFBXFccRGExtrfc1ZnYhe9jtIv2heRqisrFID9+wxhGFxNuEq45mvph5fNDOg
-# 3BaBep9mhdVY5gVEFqcxUZON2Dso+g6lPEpvENfp1/wsegUyeAaSZzo0YjQe+8i1
-# oUSU0GPGaJmayxG0mSjCQaM2NNrT4AidyHGm8OtYjtZfaGU+RFB3AqftSS+IG+/D
-# tQ0fSgs2+J8BXvCfgksnHN7h07CV7xdW0+shgHd6MUAIDQ3dLmGXs3egQIG+VmUh
-# IbnTUMQCdezwccYqNIQPETqP84UAdzJklGbPrbqevg==
+# MDcyNDA0NTMxOFowPwYJKoZIhvcNAQkEMTIEMJIyS+aTuAc0+CIue6skj22GwPcl
+# +UFQECVc6Bu4uIyQ7EpEy/lQ5i/LDmFrD7w1njANBgkqhkiG9w0BAQEFAASCAgC8
+# 5TINtmn5KkD6tI9jzYaVyCQq0BNcyZk75T05L4Vis6iNOfy8NkvUAqonhgHFsZU9
+# oA0Dx2cc0QNGfYY4CBrJAIPlWEaadWbcmBGv4i54gt6bTG9dNaautHs612E/Rfr2
+# ttUNfIN8/pafkLW1oqYkxhLCrTI9Qy1nWegD5cNQ41iIJaP6v6glOP4tJ5DPaY6E
+# /pmix+8qQoFHtqOTTfEV2sTkVt5xxalorrJJa3nfzEyi7h+DOmoZ8vvXDCqHZlLu
+# +KMtCNj3WYjK+iquHZUNdn4nhrdFoPsH3+LjMDzgO7ZFWDlygvRRllHugv7cJEIT
+# fhzEMy0DFzpMiFX50bWu7bFFA+GaW4bKLOUVL8bQMN+PQmrQ5w4naxcLDdagnEPD
+# 3UKOtjfucrm1fND97vmbEqZldl2OHSqAXuPg9Ao5hotCPXmFyTx9P9m3RZkkuWvf
+# UbLw3Rf5els0B+NpT9XDbQUItbkiavSb5EkuxJlum+Rp8ttreOsYhuDQxEYHlSNf
+# 8dLUL7EJ3eiQiU6rgRutH3SuFP9tgUZDQ7YCXhtKkfMyKA8NXqrTAPri12u5YSBv
+# C+KGij9ATeVEfsmvpLqDlcApPalCD8QPnvjzGa9hANZRsX5uKTOtBbPLd0QRz9cy
+# TTlXFMnitCBu5HzbZrJQ7UdN2iEnjGaA4SrzzkfR8Q==
 # SIG # End signature block

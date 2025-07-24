@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -20,8 +20,8 @@
 # ImportExcel v7.8.10 (2024-10-21)
 # https://github.com/dfinke/ImportExcel
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -378,8 +378,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUXrYYQ6MlEh5PSXgfpc2MYugt
-# 376ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUXWiVcpI9ejtgV9oNQ5uueLJy
+# TEqggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -581,33 +581,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBQGPJrLklXIRSdqZ4kCDdAl8A2V7DANBgkqhkiG9w0B
-# AQEFAASCAgByimadjHOIl14TVT5xPvDV3uWqNZtd5+56lRnwSil3o/jUNwv85ZLb
-# +v3MYLBzFiaZ1omaP2BpFMoUo7lPL1y2zitjO+WXR+hY5tx4o5jkpDUgcbMLQ4ek
-# 7GvR2K0TkUGOwYjQaG7Uhy4xZTPqyDjCNbEyW30pyAZxd7hAMuZWj3HwQFTLLoEW
-# w7KjS0L0ZoNd95q+SShK5rBOMt9GQx9BUWGxA/uv2QUkT+7p90ooZbZggfepaphk
-# 43chzjuJoBPKa5pDYtPpHb8Pj76SADv44FYMRqkUfZFiA6DaUVOrWUnKsLPudg3T
-# 5VNw/ZJnS/KgN4fk3e60HZeaAm8uvETbJ0NhaxClHXJrO1Uuphv4eL28LnRfcNBq
-# av4S2V35M0Nyv/bp8xyhoY/WUijojDXwff6pTAdujWdUvMbVnk9fOe0KI/hZR2jz
-# 8VeGHoFsMqsvpDEZm5edgTNWUQFuO3zcWz14rLl95MgEcd+laFnqt87KJiTFqBrZ
-# rf9j41jpV/Ucamwro6q1FWqQS0VeNXUvn3N0Ez8thwNKzx7zw2rDTJ7Hj+HEMj1w
-# V3xgrX/cqvSqR/nklxAmZck/wIUN7paAIIzNic2QipL8RV/vNnQYfpMgjEWOqfJ+
-# wx5ojQdgQglvyCw2/xsuLEZISd5t8sIN8g9LY6Vt2IMMvEuh7Oefn6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBRt1uNAU+YDYjubuOfxy9uQ0R/BjTANBgkqhkiG9w0B
+# AQEFAASCAgARSs7F+GFvf/EaKNYbMHxZgd2ToKzQryjwMzb0efpZbCVOAFk0H7Zd
+# u2BTwi9vh2o7D0nzw1JuNvjb/or3Uzgpy2+/RM6GFHu0uq7hbV/cEUYem8Kmm00j
+# 68MPPFzTrMZWLRcoOfv9DsTJfDPRgnBPX12U/EkaUcoC0nuj29SQd+/ERxXWp9yX
+# 4hN7tM+VWF9ruJ/TdZux3u2pydIaEQcTUdFsjOU6xq8wjpkpEKvn8q40QoqPhuqP
+# 6XpzCot62rqf5bDJS2XRJRBRAmmaHnGU6OJ1AHyrKQC9p0UySQYO/Wxz0eZiafws
+# Pi9d8RSyrX+kNnIGHApQFHa2l7d7UyhBjAN/epvWeG6MmY6dZMZ6yb2t+fDwugms
+# 3s3ut/LEJEk9D7gtUYuO70GJEW9Di0lVze6aSAUSMtxDNVBGXVRAuJxIGgyf8OpN
+# gpAKGpAvGw1j2ku7du/bS68yprtkGcn8yTCmXvsJnENyyGx7BP9lU7qNvq8RnFnR
+# eFZBWyTnWGLQHGKkXrYR/ciHVPqg1qlLTT0OFds8RkP+c04wg3PI5CQ8Y46G6c6Q
+# MVaHS4Qfa7socDt3xq2ELpnL7eStLhJfoYtTNljjWr6QIJOQWKIHxuFmv9MncyTB
+# griH8rbTuyHJzAtguOcg3/lGzKJBFVWADHJ8bZtC4+l84ofVJ03vYaGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDYxMlowPwYJKoZIhvcNAQkEMTIEMPI0YEev5xJIMW0aKKDr/qMSR52h
-# Qps5SCUL8KTpkaGoXTygUPiNw6y7jvylObYKnTANBgkqhkiG9w0BAQEFAASCAgAi
-# 9mgriBBddMr1cnlNEo1dxJa1V/T8xd1JNhnEbOCKr4rg7i9tM9kE/c+n20M5ow3T
-# l7NAiG6E4b9vuc2WcIQXQAv2Scetd31g9CP77tERHyR0HHHQuvDv6Vx1Yn1PJd2H
-# 2kfIbi3e54Trj0wzmmoIZjJVPV9y44c1FijY+4dVXFUsG1dm7yJHFE+sz5bLUdhF
-# LR3hWKDtrFJnQaQ0ZP5+ZoHqPWngYMPvd4qaptGq4SAkhCOIqz/YPvCWpLAKmAbR
-# ra0UqLK5A7Gq2Nuc73MMuyds4R6m/AKX2m0J8qI0BiPYVsdcvCum53/bmetcn7oK
-# 1p3MamsSPiwR9DBEXwmolBmyjyH2H7c3a2GWAo13RjKYaQKc3uOPpnV5c0MLIuyA
-# soIt2rjXizTGUwFp1os66wEe7n7FWO67g2WVZCWoXO+2sI1SLr43UZoVM6uNPAdK
-# Ef/jlq3n9LkA/4oyzD//NNCL7f7XxU91NNw/7QVtF9bMpyU3UOYz2g5n237ihC2o
-# PsjTNSFHY+HxcCdtjEg333idbJ65tI23zYZ3yAgYIZeVelmuczPRf7wcHdw8whVo
-# HOUm1DkE8rEedv4c8CHX7GYxTE6rOgRi3Ngsr6/3A6dFwDIvyj81pZUYwxFkroxK
-# bw6wwK/nsGerNR7XYNLx4OKz5zMx5OvUIh/2dTpADQ==
+# MDcyNDA0NTMyOFowPwYJKoZIhvcNAQkEMTIEMNt8fCt1ePZDD/+KGhXDJNouGadC
+# KsCi+qcKe4R6MHh1DMLzmbBhlwnQAiikAOX9bTANBgkqhkiG9w0BAQEFAASCAgBg
+# eG7BvslS2/GC/Kcf4sRJBbOCaI3tkVR+Z4UPY9sFjd9v892rEf4xX+YqutXD78YW
+# fCkZc3+PNoaKpQTf8KhRf6DdzrpWQfaZaJSLHN+bzROA+mIsnlNotUrDj8AZtOrH
+# j6wv79h+Qo/2ftbFPrDsH/BFirBXAAIpmPfsFid7bUnf0WVh4YY6uyTvktbDVuEl
+# jquuRvFQgudchqfH652KFuWQ4bmzm5lG4ldp7iQ5g2pff4WeaBaZrI63PVUccLgU
+# Joeh2QcAo7xGjWN6QNW0ucPP+EgF56Rs9u+tNyIIlGY5ttSZKqzE8Bz5HjdRgHY7
+# hGXknWdBX/HNzk7n29Y6bJxbgpd91LrSInkkqCK/yaKOu1/0Cfq2g+MdP1ogRX3K
+# 9eedP+O8PaaswoyYyyDekORunCXwuur2gFsIo5t/ky/fmNvrirGGW7shNHjTSfhr
+# YFTSgok55s5u9lp0Ga/vFGwnolWNToAHQ3/Wqsdpe56d8zakKJ99QceFjKlW6gVr
+# XzH53qi9L20lxSHtUiF/YEC0u6n9OWm1CAaJF0j1StqGsVkWQs45kvCbGvYQ8b9Q
+# BW529TgwD+kjr9zoSqlmUPw9oUQdrJh+TIZF0AQzn4d4z6F59ik7T9qh/plB6UIk
+# 2k50FyZLnYIxugLfZB+HRQPBhnS6PMbknZDewln31g==
 # SIG # End signature block

@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -161,14 +161,18 @@ if (Test-Path "$FilePath")
     }
 }
 
-# Configuration File
-if(!(Test-Path "$PSScriptRoot\Config.ps1"))
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
 {
-    Write-Host "[Error] Config.ps1 NOT found." -ForegroundColor Red
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
 }
 else
 {
-    . "$PSScriptRoot\Config.ps1"
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
 }
 
 #endregion Declarations
@@ -316,7 +320,7 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv")
 }
 
 # Create HashTable and import 'UserAgent-Blacklist.csv'
-$script:UserAgentBlacklist_HashTable = [ordered]@{}
+$script:UserAgentBlacklist_HashTable = New-Object System.Collections.Hashtable
 if (Test-Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv")
 {
     if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -MaxLines 2)
@@ -366,7 +370,7 @@ if (!($Extension -eq ".json" ))
 # Check IPinfo CLI Access Token 
 if ("$Token" -eq "access_token")
 {
-    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.ps1'" -ForegroundColor Red
+    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.json'" -ForegroundColor Red
     Write-Host ""
     Stop-Transcript
     $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -411,6 +415,7 @@ ForEach($Record in $Data)
     $NetworkNames    = ($NetworkLocationDetails | Select-Object -ExpandProperty networkNames) -join ", "
     $NetworkType     = ($NetworkLocationDetails | Select-Object -ExpandProperty networkType) -join "`r`n"
 
+    # TrustedNamedLocation
     if ($NetworkType | Select-String -Pattern "trustedNamedLocation" -Quiet)
     {
         $TrustedNamedLocation = "Yes"
@@ -475,11 +480,11 @@ ForEach($Record in $Data)
     "ResourceServicePrincipalId"     = $Record.ResourceServicePrincipalId # The identifier of the service principal representing the target resource in the sign-in event.
     "ResourceTenantId"               = $Record.ResourceTenantId # The tenant identifier of the resource referenced in the sign in.
     "RiskDetail"                     = $Record.RiskDetail # The reason behind a specific state of a risky user, sign-in, or a risk event.
-    "RiskEventTypesV2"               = $Record | Select-Object -ExpandProperty riskEventTypes_v2 # The list of risk event types associated with the sign-in.
+    "RiskEventTypesV2"               = $Record | Select-Object -ExpandProperty riskEventTypes_v2 # The list of risk event types associated with the sign-in. --> RiskEventTypesV2 (Old)
     "RiskLevelAggregated"            = $Record.RiskLevelAggregated # The aggregated risk level. The value hidden means the user or sign-in wasn't enabled for Microsoft Entra ID Protection.
     "RiskLevelDuringSignIn"          = $Record.RiskLevelDuringSignIn # The risk level during sign-in. The value hidden means the user or sign-in wasn't enabled for Microsoft Entra ID Protection.
     "RiskState"                      = $Record.RiskState # The risk state of a risky user, sign-in, or a risk event.
-    "SignInTokenProtectionStatus"    = $Record.SignInTokenProtectionStatus # oken protection creates a cryptographically secure tie between the token and the device it is issued to. This field indicates whether the signin token was bound to the device or not.
+    "SignInTokenProtectionStatus"    = $Record.SignInTokenProtectionStatus # Token protection creates a cryptographically secure tie between the token and the device it is issued to. This field indicates whether the signin token was bound to the device or not.
     "TokenIssuerName"                = $Record.TokenIssuerName # The name of the identity provider.
     "TokenIssuerType"                = $Record.TokenIssuerType # The type of identity provider.
     "UniqueTokenIdentifier"          = $Record.UniqueTokenIdentifier # A unique base64 encoded request identifier used to track tokens issued by Microsoft Entra ID as they're redeemed at resource providers.
@@ -948,7 +953,7 @@ if (Test-Path "$($IPinfo)")
                                             "CorrelationId"                = $Record.CorrelationId
                                             "ConditionalAccessStatus"      = $Record.ConditionalAccessStatus
                                             "OriginalRequestId"            = $Record.OriginalRequestId
-                                            "IsInteractive"                = $Record.IsInteractive
+                                            "SignInEventType"              = $Record.SignInEventTypes
                                             "TokenIssuerName"              = $Record.TokenIssuerName
                                             "TokenIssuerType"              = $Record.TokenIssuerType
                                             "ProcessingTimeInMilliseconds" = $Record.ProcessingTimeInMilliseconds
@@ -988,8 +993,12 @@ if (Test-Path "$($IPinfo)")
                                             "UserAgent"                    = $Record.UserAgent
                                             "UserType"                     = $Record.UserType
                                             "TrustedNamedLocation"         = $Record.TrustedNamedLocation
+                                            "UniqueTokenIdentifier"        = $Record.UniqueTokenIdentifier
                                             "SessionId"                    = $Record.SessionId
+                                            "IncomingTokenType"            = $Record.IncomingTokenType
+                                            "SignInTokenProtectionStatus"  = $Record.SignInTokenProtectionStatus
                                             "CrossTenantAccessType"        = $Record.CrossTenantAccessType
+                                            "Oauth Scope Info"             = $Record."Oauth Scope Info"
                                         }
 
                                         $Results.Add($Line)
@@ -1009,14 +1018,15 @@ if (Test-Path "$($IPinfo)")
                                     param($WorkSheet)
                                     # BackgroundColor and FontColor for specific cells of TopRow
                                     $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                                    Set-Format -Address $WorkSheet.Cells["A1:BA1"] -BackgroundColor $BackgroundColor -FontColor White
-                                    # HorizontalAlignment "Center" of columns A-X and AA-BA
+                                    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+                                    # HorizontalAlignment "Center" of columns A-X and AA-BD
                                     $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
-                                    $WorkSheet.Cells["AA:BA"].Style.HorizontalAlignment="Center"
+                                    $WorkSheet.Cells["AA:BD"].Style.HorizontalAlignment="Center"
                                     
                                     # ConditionalFormatting - AppId
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["F:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("29d9ed98-a469-4536-ade2-f981bc1d605e",$F1)))' -BackgroundColor Red # Microsoft Authentication Broker
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["F:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("2793995e-0a7d-40d7-bd35-6968ba142197",$F1)))' -BackgroundColor Yellow # 'My Apps' portal --> Threat Actor may checks how many other third party services they can access from that compromised account.
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["F:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("aebc6443-996d-45c2-90f0-388ff96faa56",$F1)))' -BackgroundColor Yellow # Visual Studio Code
 
                                     # ConditionalFormatting - AuthenticationProtocol
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["AK:AK"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("deviceCode",$AK1)))' -BackgroundColor Red # Device Code Authentication
@@ -1159,7 +1169,7 @@ if (Test-Path "$($IPinfo)")
                                             "CorrelationId"                = $Record.CorrelationId
                                             "ConditionalAccessStatus"      = $Record.ConditionalAccessStatus
                                             "OriginalRequestId"            = $Record.OriginalRequestId
-                                            "IsInteractive"                = $Record.IsInteractive
+                                            "SignInEventType"              = $Record.SignInEventTypes
                                             "TokenIssuerName"              = $Record.TokenIssuerName
                                             "TokenIssuerType"              = $Record.TokenIssuerType
                                             "ProcessingTimeInMilliseconds" = $Record.ProcessingTimeInMilliseconds
@@ -1205,7 +1215,12 @@ if (Test-Path "$($IPinfo)")
                                             "UserAgent"                    = $Record.UserAgent
                                             "UserType"                     = $Record.UserType
                                             "TrustedNamedLocation"         = $Record.TrustedNamedLocation
+                                            "UniqueTokenIdentifier"        = $Record.UniqueTokenIdentifier
+                                            "SessionId"                    = $Record.SessionId
+                                            "IncomingTokenType"            = $Record.IncomingTokenType
+                                            "SignInTokenProtectionStatus"  = $Record.SignInTokenProtectionStatus
                                             "CrossTenantAccessType"        = $Record.CrossTenantAccessType
+                                            "Oauth Scope Info"             = $Record."Oauth Scope Info"
                                         }
 
                                         $Results.Add($Line)
@@ -1220,13 +1235,14 @@ if (Test-Path "$($IPinfo)")
                             param($WorkSheet)
                             # BackgroundColor and FontColor for specific cells of TopRow
                             $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                            Set-Format -Address $WorkSheet.Cells["A1:BD1"] -BackgroundColor $BackgroundColor -FontColor White
-                            # HorizontalAlignment "Center" of columns A-X and AA-BD
+                            Set-Format -Address $WorkSheet.Cells["A1:BH1"] -BackgroundColor $BackgroundColor -FontColor White
+                            # HorizontalAlignment "Center" of columns A-X and AA-BG
                             $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
-                            $WorkSheet.Cells["AA:BD"].Style.HorizontalAlignment="Center"
+                            $WorkSheet.Cells["AA:BG"].Style.HorizontalAlignment="Center"
                             
                             # ConditionalFormatting - AppId
                             Add-ConditionalFormatting -Address $WorkSheet.Cells["F:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("29d9ed98-a469-4536-ade2-f981bc1d605e",$F1)))' -BackgroundColor Red # Microsoft Authentication Broker
+                            Add-ConditionalFormatting -Address $WorkSheet.Cells["F:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("aebc6443-996d-45c2-90f0-388ff96faa56",$F1)))' -BackgroundColor Yellow # Visual Studio Code
                             
                             # ConditionalFormatting - AuthenticationProtocol
                             Add-ConditionalFormatting -Address $WorkSheet.Cells["AK:AK"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("deviceCode",$AK1)))' -BackgroundColor Red # Device Code Authentication
@@ -1708,6 +1724,21 @@ if ($Total -ge "1")
 {
     $Stats = $Untouched | Group-Object SignInEventTypes | Select-Object @{Name='SignInEventTypes';Expression={$_.Name}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\SignInEventTypes.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInEventTypes" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-C
+    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+    }
+}
+
+# SignInTokenProtectionStatus (Stats)
+$Total = ($Untouched | Select-Object SignInTokenProtectionStatus | Measure-Object).Count
+if ($Total -ge "1")
+{
+    $Stats = $Untouched | Group-Object SignInTokenProtectionStatus | Select-Object @{Name='SignInTokenProtectionStatus';Expression={$_.Name}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\SignInTokenProtectionStatus.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInTokenProtectionStatus" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
     $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
@@ -2632,12 +2663,12 @@ if ($Count -ge 1)
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
     $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:AY1"] -BackgroundColor $BackgroundColor -FontColor White
-    # HorizontalAlignment "Center" of columns A-AY
-    $WorkSheet.Cells["A:AY"].Style.HorizontalAlignment="Center"
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-BD
+    $WorkSheet.Cells["A:BD"].Style.HorizontalAlignment="Center"
 
     # ConditionalFormatting - CrossTenantAccessType
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("b2bCollaboration",$AZ1)))' -BackgroundColor Red
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["BC:BC"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("b2bCollaboration",$BC1)))' -BackgroundColor Red
 
     }
 }
@@ -2715,6 +2746,243 @@ foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys)
     {
         $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
         Write-Host "[Alert] Suspicious User-Agent detected: $UserAgent ($Count)" -ForegroundColor $Severity
+    }
+}
+
+# LETHAL-021: Unusual PRT Usage and Registered Device for User Principal [T1098.005]
+# This rule alerts when a user principal authenticates from a potential newly observed device, particularly if the session is unbound, which is characteristic of token replay or device spoofing.
+# Adversaries trick users into authorizing access for the Microsoft Authentication Broker (MAB) targeting the Device Registration Service (DRS), obtain a RT, and then use a tool like ROADtx to silently register a fake Windows device and mint a PRT.
+# https://www.elastic.co/security-labs/entra-id-oauth-phishing-detection
+# https://github.com/elastic/detection-rules/blob/main/rules/integrations/azure/persistence_entra_id_user_signed_in_from_unusual_device.toml
+# https://attack.mitre.org/techniques/T1098/005/
+$Import = $Hunt`
+| Where-Object { $_.AppId -eq "29d9ed98-a469-4536-ade2-f981bc1d605e" }`
+| Where-Object { $_.UserType -eq "Member" }`
+| Where-Object { $_.SignInTokenProtectionStatus -eq "unbound" }`
+| Where-Object { $_.DeviceId -ne "" }`
+| Where-Object { $_.IncomingTokenType -eq "primaryRefreshToken" }
+
+$Count = ($Import | Measure-Object).Count
+
+if ($Count -ge 1)
+{
+    Write-Host "[Alert] Possible Token Replay - Unusual PRT Usage and Registered Device found ($Count)" -ForegroundColor Red
+    New-Item "$OUTPUT_FOLDER\EntraSignInLogs\Alerts" -ItemType Directory -Force | Out-Null
+
+    # XLSX
+    $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Unusual-PRT-Usage-and-Registered-Device.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Unusual PRT Usage" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-BD
+    $WorkSheet.Cells["A:BD"].Style.HorizontalAlignment="Center"
+
+    # ConditionalFormatting - AppId
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["F:F"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("29d9ed98-a469-4536-ade2-f981bc1d605e",$F1)))' -BackgroundColor Red # Microsoft Authentication Broker
+
+    # ConditionalFormatting - AppDisplayName
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["G:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Microsoft Authentication Broker",$G1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - DeviceId --> Check if the device was registered the last 7 days! --> Devices-Analyzer.ps1
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AB:AB"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("-",$AB1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - UserType
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AX:AX"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Member",$AX1)))' -BackgroundColor Red # Microsoft Entra ID user
+
+    # ConditionalFormatting - TrustedNamedLocation
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Yes",$AY1)))' -BackgroundColor $Green # Trusted IP Ranges
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("No",$AY1)))' -BackgroundColor Red # Untrusted Location
+
+    # ConditionalFormatting - IncomingTokenType
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["BB:BB"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("primaryRefreshToken",$BB1)))' -BackgroundColor Red # Primary Refresh Token (PRT) --> Persistence
+
+    # ConditionalFormatting - SignInTokenProtectionStatus
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["BC:BC"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("unbound",$BC1)))' -BackgroundColor Red # Session is unbound, which is characteristic of token replay or device spoofing.
+
+    # Bound / Unbound
+    # Token protection creates a cryptographically secure tie between the token and the device (client secret) it's issued to. Without the client secret, the bound token is useless. 
+    # When a user registers a Windows 10 or newer device in Microsoft Entra ID, their primary identity is bound to the device. 
+    # What this means: A policy can ensure that only bound sign-in session (or refresh) tokens, otherwise known as Primary Refresh Tokens (PRTs) are used by applications when requesting access to a resource.
+
+    # ConditionalFormatting - ASN
+    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AS1)))' -f $ASN
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AS:AT"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    # ConditionalFormatting - Country
+    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AP1)))' -f $Country
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AP:AQ"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    # ConditionalFormatting - UserAgent
+    foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
+    {
+        $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AW1)))' -f $UserAgent
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AW:AW"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+    }
+
+    }
+}
+
+# ResourceId
+# 90a2e5d2-fd7a-4a2e-bc90-3dc50ae8e3ee - ???
+
+# LETHAL-022: Suspicious Sign-Ins via Visual Studio Code Client --> Visual Studio Code Phishing (Abusing Legitimate Microsoft Workflow)
+# https://www.elastic.co/security-labs/entra-id-oauth-phishing-detection
+# https://github.com/elastic/detection-rules/blob/main/rules/integrations/azure/initial_access_entra_oauth_phishing_via_vscode_client.toml
+$Import = $Hunt`
+| Where-Object { $_.AppId -eq "aebc6443-996d-45c2-90f0-388ff96faa56" }`
+| Where-Object { $_.ResourceId -eq "00000003-0000-0000-c000-000000000000" }`
+| Where-Object { $_.UserType -eq "Member" }`
+| Where-Object { $_.Status -eq "Success" }
+
+$Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
+
+if ($Count -ge 1)
+{
+    Write-Host "[Alert] Suspicious Sign-In(s) via Visual Studio Code Client found ($Count)" -ForegroundColor Red
+    New-Item "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\VSCode" -ItemType Directory -Force | Out-Null
+
+    # XLSX
+    $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\VSCode\Suspicious-SignIns-via-Visual-Studio-Code.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "VSCode" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-BD
+    $WorkSheet.Cells["A:BD"].Style.HorizontalAlignment="Center"
+
+    # ConditionalFormatting - AppId
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["F:F"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("aebc6443-996d-45c2-90f0-388ff96faa56",$F1)))' -BackgroundColor Red # Visual Studio Code (VSCode)
+
+    # ConditionalFormatting - AppDisplayName
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["G:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Visual Studio Code",$G1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - SignInEventType
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["L:L"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("nonInteractiveUser",$L1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - ResourceDisplayName
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["U:U"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Microsoft Graph",$U1)))' -BackgroundColor Red # Delegated Access to the Microsoft Graph API
+
+    # ConditionalFormatting - ResourceId
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["V:V"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("00000003-0000-0000-c000-000000000000",$V1)))' -BackgroundColor Red # Microsoft Graph
+
+    # ConditionalFormatting - UserType
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AX:AX"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Member",$AX1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - TrustedNamedLocation
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Yes",$AY1)))' -BackgroundColor $Green # Trusted IP Ranges
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("No",$AY1)))' -BackgroundColor Red # Untrusted Location
+
+    # ConditionalFormatting - ASN
+    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AS1)))' -f $ASN
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AS:AT"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    # ConditionalFormatting - Country
+    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AP1)))' -f $Country
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AP:AQ"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    # ConditionalFormatting - UserAgent
+    foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
+    {
+        $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AW1)))' -f $UserAgent
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AW:AW"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+    }
+
+    }
+}
+
+# LETHAL-023: Suspicious ADRS Token Request by Microsoft Authentication Broker
+# https://www.elastic.co/security-labs/entra-id-oauth-phishing-detection
+# https://github.com/elastic/detection-rules/blob/6b6407df88319f466c6cc56147210635bba5eb01/rules/integrations/azure/persistence_entra_id_suspicious_adrs_token_request.toml
+# Detects suspicious OAuth 2.0 token requests where the Microsoft Authentication Broker (29d9ed98-a469-4536-ade2-f981bc1d605e) requests access to the Device Registration Service (01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9) on behalf of a user principal. 
+# The presence of the adrs_access scope in the authentication processing details suggests an attempt to access ADRS, which is atypical for standard user sign-ins. 
+# This behavior may reflect an effort to abuse device registration for unauthorized persistence, such as acquiring a Primary Refresh Token (PRT) or establishing a trusted session.
+$Import = $Hunt`
+| Where-Object { $_.AppId -eq "29d9ed98-a469-4536-ade2-f981bc1d605e" }`
+| Where-Object { $_.ResourceId -eq "01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9" }`
+| Where-Object { $_."Oauth Scope Info" -match "adrs_access" }`
+| Where-Object { $_.IncomingTokenType -eq "refreshToken" }`
+| Where-Object { $_.UserType -eq "Member" }
+
+# | Where-Object { $_.IncomingTokenType -eq "refreshToken" -or $_.IncomingTokenType -eq "none" }`
+
+$Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
+
+if ($Count -ge 1)
+{
+    Write-Host "[Alert] $Count Suspicious ADRS Token Request(s) by Microsoft Authentication Broker found" -ForegroundColor Red
+    New-Item "$OUTPUT_FOLDER\EntraSignInLogs\Alerts" -ItemType Directory -Force | Out-Null
+
+    # XLSX
+    $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Suspicious-ADRS-Token-Request-by-MAB.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ADRS Token Requests" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns A-BE
+    $WorkSheet.Cells["A:BE"].Style.HorizontalAlignment="Center"
+    
+    # ConditionalFormatting - AppId
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["F:F"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("29d9ed98-a469-4536-ade2-f981bc1d605e",$F1)))' -BackgroundColor Red # Microsoft Authentication Broker (MAB)
+    
+    # ConditionalFormatting - AppDisplayName
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["G:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Microsoft Authentication Broker",$G1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - ResourceDisplayName
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["U:U"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Device Registration Service",$U1)))' -BackgroundColor Red
+    
+    # ConditionalFormatting - ResourceId
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["V:V"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("01cb2876-7ebd-4aa4-9cc9-d28bd4d359a9",$V1)))' -BackgroundColor Red # Device Registration Service (DRS)
+
+    # ConditionalFormatting - Oauth Scope Info
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["BD:BD"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("adrs_access",$BD1)))' -BackgroundColor Red # ["adrs_access"]
+
+    # ConditionalFormatting - IncomingTokenType
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["BB:BB"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("refreshToken",$BB1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - UserType
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AX:AX"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Member",$AX1)))' -BackgroundColor Red
+
+    # ConditionalFormatting - TrustedNamedLocation
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Yes",$AY1)))' -BackgroundColor $Green # Trusted IP Ranges
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["AY:AY"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("No",$AY1)))' -BackgroundColor Red # Untrusted Location
+
+    # ConditionalFormatting - ASN
+    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AS1)))' -f $ASN
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AS:AT"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    # ConditionalFormatting - Country
+    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    {
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AP1)))' -f $Country
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AP:AQ"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+    }
+
+    # ConditionalFormatting - UserAgent
+    foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
+    {
+        $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$AW1)))' -f $UserAgent
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AW:AW"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+    }
+
     }
 }
 
@@ -2799,8 +3067,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUj13QFSM+3HObf+JRHwxnF81G
-# A8SggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUnYRV5nrkidhjqGzoxhFvGKZg
+# dquggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -3002,33 +3270,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBQEFIGKATgdcjauaeOyCfhxO51rITANBgkqhkiG9w0B
-# AQEFAASCAgC8/JJNpHjvz/OByAFf2X3dHULp6amDSivJxjdMuhL81RLKfia6xkIL
-# dIegEihDwxUdDYYai3FIbCWx70SGJUytkliqzHQV9Y+xPmjRKkGVeQ50U7CVpfrQ
-# skn0qtqKWTQ/6euSrA5/qpPZkSJMib+AjpjqkTJP7PH7SXHLdTuICEjIjzFmRJ38
-# nMSMwdT6umZD7RkdrvHbhEOAcyiplUhpK70gB+mYZ5FrCjVy65yOhyLVRDO0YKSF
-# jNcl/pf0EPNOudVvHK64Z7OST2BaX+4hzE6PBPA2t4IyO5crJL1GFTfYU+e0Z+oQ
-# X8Y65Bo3bJ/5V0JC0RdgMzrobZ16zhKHMz+m+Lbod02+GyePGIfCDw8h6sep4fUw
-# n09r4v+3UQqI3EZynV/HFgWL2O0pOPA+h1nneE8tMX2yjKgTLUr4tXe8i0TLqq6f
-# OujveGagMVI6q9Bfs+9i248KUPtEiYe5SM5MlPGkWPrNBmpskXxEZVxJDPZxmwKX
-# roqEcYWn3byklPPZO2NVH9+Fbc9YuS1lWtwHz2wsxT2WQGc9ayV6SyfZ2RefWEWt
-# gm4a1LSFdISIbBIi3GAPFb63oFtw5YuMwHALWX7db9mhuLzWyFFWSc7U3FFqdEeH
-# z+Rbx6I5ncO8MMf4U6OO2DwIw5ihSEZLjS0KQ8KqzseqemWrnhAS0aGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQqZdiYiqsaOD5jUMU2UXuBHioK+TANBgkqhkiG9w0B
+# AQEFAASCAgCBbgd/ZhI7pgAoijwwT9/uGr4wOLu0rZURQ1gvC9PXV1KksEFeK7sC
+# rXDoefHs81dOuoPbIIk+UULbEkEEUTjnrX5M6KAy3/OxujkefzicFTiSpQNtgC6K
+# gScyO0901g81xFfivsdF6vkk7Yi1Er50z65/SHk4bMl2GHf5l6xa+T+9N3vwL/0l
+# WGikACgf8csysA30+Q7wB263GlzjCDkXKWk0mYo+MYmBUVZqUSamRUrshSlARkVw
+# vASG/ULm7q4oi58yHXyL1z+PnpLrTOJMTpyAuY/13BNayf4fZWoDmplBvymwEwoK
+# 0HBrC/25tmJRvdGIfMGncn9TJ4lEX7RXlCLAF42gPE6ceHQCtagFY3WLTxgovhOk
+# Tqu5ZvgMupbdoIXYSFnWB8qTcmKti0FjqkysRRSVJIvDa51K2r3HVG/eBjc5ON9F
+# CLznhoIx8c59yBEPf6mHT1lqK+ggUqDRDkre4JsIZybmC2Ok7w2NS1XpFudTLvOj
+# 4O4tuUhBC7CExM5hslGSfe9JsKqff1C4aI2R0T4BlAY8PF/BmaOYSBvtBE27ehdQ
+# reWGOErklGMlvGCjBMtzkue9aQjR7qNtgeVaOFKSSje2yKXov4Zxd3r3gV+Xfbwb
+# F93FtK0AwVa2gnFKSIt0acjjxzklgsAP4b7Rs4+HSzSorn4BNfjfYKGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDUzOVowPwYJKoZIhvcNAQkEMTIEMFyVmjKGGJ5DD50lrLniqOY670NI
-# 8V2jDmHgp7G/dtigVrkM0i+rv6OIc8G5QLeedTANBgkqhkiG9w0BAQEFAASCAgCs
-# R4KzxF2wFK7ec5efkqJ2SX47fivrv5be+8c3hj14u7CQCfOmCqoW8T0sjGefGahg
-# gGy9ltJ4J2O/Xb/186wRGLrA8maGA2LJv6THKjPdY13uf33siq5HC+pFphIOlZyU
-# EZbjrsDRcGNjVOmYFS4KkeI+mqOnooceVwF8ze/Pydb0wHWBWi1AWwrW5xZmgUO3
-# vgZYNdx4tupiTBJf9fw0r8y7W58AUByZ8NlAvkSkybjF9s9RTVKqggyLTV0NTGYg
-# 616jbJ5XWzxxopRxpZy+dELeQ032U/w5ri25uDClNvFH+oslkrymdWtCQCnLbN9c
-# VL8Rx0S9TJ0jSpEVRQyJcGgB2G8Mbl9xOFwrqZG2zqpn8pMbRv6M2FZAxFDNZ0P/
-# t4+ReGF3aqjhucdVWlVMj8dNJlTZbhjTVS5RdBVzeK0eomfEClZuMzZYywDzszGR
-# 7cH1Phgypt9bnL77ME1sMoQYhvMTPQmnwCUY/Yc6UT2Mr4J8jxK5Bl1F34Y7tpZd
-# f7c07aJcylQe2FMvk3nFd46acgCjQS7QN5RWBFag8DLO4USUQCONziBYq9vG/j1y
-# 5nypiOonGWWXMD4g2yYDLOyY52KvDnPdPzKpPID7td8/Ip/lutwlzUHXe2m7tmvU
-# I9Mtmi/ITYUKTWDuWqF+eh/HcgyGv5SB6iRI/NQJoQ==
+# MDcyNDA0NTI1NFowPwYJKoZIhvcNAQkEMTIEMLM4hbOAHyn0G3C3Ugi4cCDo1QN2
+# 5eeHmNp55WFN9Rv5yjIWtbBjMwQwvVHdL4Vy4zANBgkqhkiG9w0BAQEFAASCAgBo
+# 1wmaT8ilZzZ3lnJR9pfY7X30xeAx1yGOHm+GXbT+sj8FqSNqW1h+zNLBU1vLKXsQ
+# L/gAgJU9WeznJC+Fhb9Y4eVncX9/NVTMD6Mtgwt52bXAJmN30CGrxgZEZS2ZQnHI
+# A8k6AfYhCnAr0E5f/XNVXiFsjWcTh1VrmauwAQuHcwykFbG6NcTAXhHJhDUVN01d
+# dHsLrsscxnFS5b0azGxdgwtYPCMCWnXG6lnj/n3PVZdPW+f2cxf8LjE6almcd0Tl
+# tt5nytt/TZkFQaEpSteVdWi3MYAmehT9YGO3O/Re1vlJntSq9aXYhJf1w57D1533
+# mWQ7vv37MyhpfnLnXhgm1visj3MIXhl3FaNsWMK/08CrJMX67zoqkOsNh3vD88QQ
+# sOSj9jQNTXUl+04zUnMj0GNpz+zIEfKpGLG1UzIYeh8tiwB+xrWlHgRJSj2lsG81
+# pAYRYFqkyBXxEhG1I3sVXK+OEvdETp/ssjKJ/XUT7wR4iOpbyInJS6oVz2aRyVZ8
+# E2LgR2wRllX/SZIvUuQdeuyhi9dV42scQeMjfO5MrZ5JV6n4fUSWYd5JNHZpnoxP
+# Hdhfjz8nDLnok/bgDLwpVI1C4NthTmSVQs6BgbmLwtW+Kf9YoO6z0f+vpcO0HjuR
+# 8foNk60ahX83xKupXK8vEqwmsTmWnpCT4qRVL7/nxw==
 # SIG # End signature block

@@ -779,7 +779,9 @@ if ($PSVersionTable.PSVersion.Major -eq "7")
 }
 
 # PowerShell v7
-# Update-PSResource Az
+# Get-InstalledPSResource Az -Scope CurrentUser
+# Find-PSResource -Name Az --> Check for the newest version in PSGallery
+# Find-Module -Name Az --> Check for the newest version in PSGallery
 # Update-PSResource Az -Repository 'PSGallery' -TrustRepository
 
 # Set-PSResourceRepository -Name PSGallery -Trusted

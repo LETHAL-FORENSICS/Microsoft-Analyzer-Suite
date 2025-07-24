@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -150,14 +150,18 @@ if (Test-Path "$FilePath")
     }
 }
 
-# Configuration File
-if(!(Test-Path "$PSScriptRoot\Config.ps1"))
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
 {
-    Write-Host "[Error] Config.ps1 NOT found." -ForegroundColor Red
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
 }
 else
 {
-    . "$PSScriptRoot\Config.ps1"
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
 }
 
 #endregion Declarations
@@ -324,7 +328,7 @@ if (!($Extension -eq ".csv" ))
 # Check IPinfo CLI Access Token 
 if ("$Token" -eq "access_token")
 {
-    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.ps1'" -ForegroundColor Red
+    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.json'" -ForegroundColor Red
     Write-Host ""
     Stop-Transcript
     $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -354,30 +358,14 @@ Write-Output "[Info]  Processing M365 Message Trace Logs ($UserId) ..."
 New-Item "$OUTPUT_FOLDER\MessageTraceLogs\CSV" -ItemType Directory -Force | Out-Null
 New-Item "$OUTPUT_FOLDER\MessageTraceLogs\XLSX" -ItemType Directory -Force | Out-Null
 
-# Check Timestamp Format
-$Timestamp = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object Received -First 1).Received
-
-# de-DE
-if ($Timestamp -match "\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}")
-{
-    $script:TimestampFormat = "dd.MM.yyyy HH:mm:ss"
-}
-
-# en-US
-if ($Timestamp -match "\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} (AM|PM)")
-{
-    $script:TimestampFormat = "M/d/yyyy h:mm:ss tt"
-}
-
-# en-GB
-if ($Timestamp -match "\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}")
-{
-    $script:TimestampFormat = "MM/dd/yyyy HH:mm:ss"
-}
+# Import CSV
+$Data = Import-Csv -Path "$LogFile" -Delimiter "," | Sort-Object { $_.Received -as [datetime] } -Descending
 
 # Time Frame
-$StartDate = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object @{Name="Received";Expression={([DateTime]::ParseExact($_.Received, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}} | Sort-Object { $_.Received -as [datetime] } -Descending | Select-Object -Last 1).Received
-$EndDate = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object @{Name="Received";Expression={([DateTime]::ParseExact($_.Received, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}} | Sort-Object { $_.Received -as [datetime] } -Descending | Select-Object -First 1).Received
+$Last  = ($Data | Select-Object -Last 1).Received
+$First = ($Data | Select-Object -First 1).Received
+$StartDate = (Get-Date $Last).ToString("yyyy-MM-dd HH:mm:ss")
+$EndDate = (Get-Date $First).ToString("yyyy-MM-dd HH:mm:ss")
 Write-Output "[Info]  Log data from $StartDate UTC until $EndDate UTC"
 
 # XLSX
@@ -1126,7 +1114,7 @@ if (Test-Path "$($IPinfo)")
                             }
 
                             $Line = [PSCustomObject]@{
-                                "Received"         = ($Record | Select-Object @{Name="Received";Expression={([DateTime]::ParseExact($_.Received, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}}).Received
+                                "Received"         = (Get-Date $Record.Received).ToString("yyyy-MM-dd HH:mm:ss") # UTC
                                 "SenderAddress"    = $Record.SenderAddress
                                 "RecipientAddress" = $Record.RecipientAddress
                                 "Subject"          = $Record.Subject
@@ -1505,7 +1493,7 @@ Write-Output "$ElapsedTime"
 # Stop logging
 Write-Host ""
 Stop-Transcript
-Start-Sleep 1
+Start-Sleep 0.5
 
 # MessageBox UI
 $MessageBody = "Status: Message Trace Log Analysis completed."
@@ -1532,8 +1520,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUYJ4R6TtjgjLIZ357R0sZGI7Z
-# JoSggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUJmEmJGpnMwixOZRI82BOguEO
+# d/uggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -1735,33 +1723,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBTBbLoyOZkPC15lgIxDME3sziVopzANBgkqhkiG9w0B
-# AQEFAASCAgBLvbOvoiGPCNOFsaQL2e1N3yAIp/VCztMBFkWMfiSPBzO/yTPIJxF6
-# s80t7xZxxDarXBpwF3EI14b8/tCgq9uG2UfVELLYaz+AdzFMsytI+AsqfCzzptRU
-# uTB1hzJ1Qp/+mZDrxumYNGgZ8PsBqDumHDRElo/2hEh8buGMd/vdN5AFu1y03KfZ
-# vqIOufX4CbrpEfh82IgMO47iuPgfHI7KBXzqRq6zuAZtPh4+3AbGq/NyVduwJF35
-# MLK3sok/Y52x4Okp5LiUSFs2Bqsj1Apo06BdTqC9t4V5TgTezB79uaNhgouyUjxf
-# IYNSyW8vq5LuzL0izf88OJ3e5h4guy+9fM+L36kbkDPgoTajsR1wVJALY69iKU7K
-# cT3xYRfGmcwySvqPQf2Er8eUCk9ebSDbOi4g9+sWor67yYklu7q9iWgo7QX1TQMW
-# MaJfWXXE91Q5oSEEP/uwErnuG/7IBJQEQThWU3eLAhkjVDy1cMrIbqS2GbNpPSrj
-# 5TAdhdR8RXklFvKIihuvYOva+zTO4Lienw6FAkSTynHKJeFMd+k8OQwlpIRH5C74
-# 3Hn4wi6bspp5G8VBv8Djp33vQ9PTVUUmCnjSc8kWe3EcZ90AZiMEP50EBR+MT7Gk
-# 6gz2F0ICIh1eSOxM5CcnYkUvagDxTjEn5PpVtF38AnoxfDHiZhrF5qGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBR7F9b0w+YAUZN4aY0m8BaA8mmqyTANBgkqhkiG9w0B
+# AQEFAASCAgBNv+aujeEbSpJ4MpeuY5U28AquMhltP5Tyn/zAnV0SERO009TWCjaT
+# qrOREUF9cK6g9T/BfVAkm3FGHLBSm+EDQzEmHHZ5djcRYpzK/QMrF2/NvI9Q1Ls3
+# 3HABbZKr4agIdvHC6L1E9eqhEoKB97UO4djhd86avsow4fVyvt5Am1L+RsPvmZb5
+# cefozA9+pXZFjYbtY5iPblhDXpGWJIJ4dHb45pUr7giI0mUSIZNkBtNpHuQyW1By
+# rFcrhbwZ1E/V7KYS2kjl3eSuqAts0G/BgUZdbMo9XrGdOg25ZGdQSdsvewsipv1S
+# 28LTibRoSUwsJ5xMV0Jm7Ruafmd5kIVM8PvyaW0zAW0WSgWezqtRhNn8Qrr40FvJ
+# 2Lw3TXjoDFVY00ljUGc5gT9jcvM5H85m7mbdMGcALfFDVuwlTa3h7OYiyNB96ZLR
+# azwsEckYxp23aY6vc8oeTJpqNZl2rMoTiCcWKHeyOWZ7aAh08wdiHkd4ZebHRbYI
+# DtXjxDjFInIdSuWEdybYnXCAVC+UAhRXNWo5g/d+ESQOg1VB8zIz30k3eKQbaqKs
+# bCMnCRkMYPmCu/mdh4VJsIdeB1w2nW1IXpfrVCcpiTLM3LoGwmvkxpgp/qSaQBG0
+# 6x2IEzrVReTAS3atxLJZRGh5jNgzsopR1vdJlVKerSjA51emXUd1baGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDU1MlowPwYJKoZIhvcNAQkEMTIEMD9mIs/gbiTbu8VQsvTIBEPwa6Ne
-# fwi85c5WY2MJC0k8Rf6Cjfvix0gwi+t8GeQMPzANBgkqhkiG9w0BAQEFAASCAgAF
-# Bls91YyuvEX39m9g7VjgcPrPyPX+9N3Bre8x7MqMwlHylUviBELm9XKxQ3v9NveQ
-# wel2hppOxb5onjvVisGZ28Ml9aCdFPxOyVXCavM5+kx2FGPfDML0we6MbD4FVwrM
-# BMAaYnjGCkZMMDjNLMJOczp8W/ha+AX3UU7R26qhTel47XjG1ND/j6Qo76tKWbHH
-# Rw/mJGzLp9l0rPHTd93GR6LstEctk8QmzCDgPffX2rubMGkhItg7sii6iivYrjlC
-# XtMP6aBTQwx0x8DADClATIxWMtUv6YPThUnrIzhQezpoHx+W/voll3patT8gZALz
-# 0mkF3Lh6uUiHK0ZVvG6DvGaM3xBmhfnUGmrMlo2lL9GFLitFV0flU05CSwQtbE2c
-# 4XbEOq/qZQ5V4pCQQeQy+phU8UmxKkXrEuSGD21uFMHzcDrsIDN7bqtVy9i/puM/
-# SDa6dCBn5xtxEAn1uaekA618ZqubzDpu9/jHNuf8qx8aj5PZIbaRkcszaLsbVCMZ
-# FH3Ojw/+GRj0qoXCrgBHE7qKFrKvcqOamwmIrHh69H/cNfy0mBfVr2P2jXss4NCv
-# NB5DV7DDS7bhweYtQkaU4lT6pabV6yUuYN3RVaj8PhTInEdV8rME9bbqrLoxPWIv
-# zA4LLZwxdlL7trcQ3K7qPglrw/iF/PYaHGGFeF0EXQ==
+# MDcyNDA0NTMwN1owPwYJKoZIhvcNAQkEMTIEMN4t5M1twnNnpdN5HHqItlyHNFiU
+# aFb05l82y+33xVgra9hh7YlXULvE+KoquA/fyzANBgkqhkiG9w0BAQEFAASCAgCE
+# eFx+u/mLDpuUNKHfRsHY/OgFTAW4V+VthQ8wjJttAZ56kVC7IMHxVraCwWIrlS5q
+# dhrVRZJwYV63Uvk2gBEkebQpbAXJxwG06TTAuPGs4LKzsdcDZSXmhdBwg1cez4Dq
+# JsXmJmeHuC1yrewB4RNsWt067NV086sAjBkZs5fQUxEchvzf2ooVsfJDnOyADKvV
+# 9PiCJeQ8VgEFqlsnAQuFLxXUna59uJ74TO/qLZPUnRqH9V3XjfPSF9MvJmcAOjp3
+# F9LQxKiyEWUNSns3A3jOeVn77MvnnT/GX7ZKZHAtwCLLYwnAqu/7GMukBKsi6QBn
+# S0ijeyAvEmDe1XegvY07Pbcwzo8crCUvicahkzYiXNYv0ZzEMhX8JmrgmEdoylkU
+# 0jWziBw/0WotFvK+M3L5a4444qhvwfi2KN0LO7uJ54mdaXBbWvRbA/pBAvWbYCsk
+# EPO2C3AYocIEwq2pWMfkdPwj9DCnUPIsgFs6h1Aj2vBNsOZptMAyog+Qi2HpCUtO
+# jVv2eqQIdBbGmtvbxxG47FUDcKZtj1y8ODEK/udt1/B5CKtFZ7jBwXO4NXmF7o4E
+# 7SiVZ+Azy/lwDWEo/hIej0vEkQE17LlhKrMOhBq+d4bCblFuJ/TlsxCwdK5z0C04
+# w6ScTnwiabfHDcMtny4Xw20bOpcqyKmYoXQ1V0Qe1w==
 # SIG # End signature block

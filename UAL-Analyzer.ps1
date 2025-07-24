@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -183,14 +183,18 @@ if (Test-Path "$FilePath")
     }
 }
 
-# Configuration File
-if(!(Test-Path "$PSScriptRoot\Config.ps1"))
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
 {
-    Write-Host "[Error] Config.ps1 NOT found." -ForegroundColor Red
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
 }
 else
 {
-    . "$PSScriptRoot\Config.ps1"
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
 }
 
 #endregion Declarations
@@ -354,7 +358,7 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\MoveToFolder-Blacklist.csv")
 }
 
 # Create HashTable and import 'UserAgent-Blacklist.csv'
-$script:UserAgentBlacklist_HashTable = [ordered]@{}
+$script:UserAgentBlacklist_HashTable = New-Object System.Collections.Hashtable
 if (Test-Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv")
 {
     if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -MaxLines 2)
@@ -456,7 +460,7 @@ if (!($Extension -eq ".csv" ))
 # Check IPinfo CLI Access Token 
 if ("$Token" -eq "access_token")
 {
-    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.ps1'" -ForegroundColor Red
+    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.json'" -ForegroundColor Red
     Write-Host ""
     Stop-Transcript
     $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -570,6 +574,7 @@ ForEach($Record in $Data)
     "ClientIPAddress"       = $AuditData.ClientIPAddress
     "UserAgent"             = $UserAgent
     "ClientInfoString"      = $AuditData.ClientInfoString
+    "ActorInfoString"       = $AuditData.ActorInfoString
     "RequestType"           = ($AuditData | Where-Object { $_.Operation -eq "UserLoggedIn" } | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
     "SessionId"             = $SessionId
     "InterSystemsId"        = $AuditData.InterSystemsId # The GUID that track the actions across components within the Office 365 service
@@ -599,10 +604,10 @@ if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\Custom.csv")
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
         $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:V1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-E and G-V
+        Set-Format -Address $WorkSheet.Cells["A1:W1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns A-E and G-W
         $WorkSheet.Cells["A:E"].Style.HorizontalAlignment="Center"
-        $WorkSheet.Cells["G:V"].Style.HorizontalAlignment="Center"
+        $WorkSheet.Cells["G:W"].Style.HorizontalAlignment="Center"
         }
     }
 }
@@ -631,6 +636,21 @@ if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\SessionCookieTheft.csv")
 
 # Stats
 New-Item "$OUTPUT_FOLDER\UnifiedAuditLogs\Stats" -ItemType Directory -Force | Out-Null
+
+# ActorInfoString (Stats)
+$Total = (Import-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\Custom.csv" -Delimiter "," | Select-Object ActorInfoString | Where-Object {$_.ActorInfoString -ne '' } | Measure-Object).Count
+if ($Total -ge "1")
+{
+    $Stats = Import-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\Custom.csv" -Delimiter "," -Encoding UTF8 | Where-Object {$_.ActorInfoString -ne '' } | Group-Object ActorInfoString | Select-Object @{Name='ActorInfoString'; Expression={$_.Name}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Stats\ActorInfoString.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ActorInfoString" -CellStyleSB {
+    param($WorkSheet)
+    # BackgroundColor and FontColor for specific cells of TopRow
+    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    # HorizontalAlignment "Center" of columns B-C
+    $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+    }
+}
 
 # ClientInfoString (Stats)
 $Total = (Import-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\Custom.csv" -Delimiter "," | Select-Object ClientInfoString | Measure-Object).Count
@@ -3649,7 +3669,7 @@ if ($Count -gt 0)
         if(Test-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-Operations\CSV\Consent-to-application_AuditData.csv" -MaxLines 2)
         {
             $IMPORT = Import-Csv "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-Operations\CSV\Consent-to-application_AuditData.csv" -Delimiter ","
-            $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-Operations\XLSX\Consent-to-application_AuditData.xlsx" -FreezePane 2,7 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Consent to application." -CellStyleSB {
+            $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-Operations\XLSX\Consent-to-application_AuditData.xlsx" -FreezePane 2,7 -NoHyperLinkConversion * -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Consent to application." -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
             $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
@@ -4198,6 +4218,7 @@ if (Test-Path "$($IPinfo)")
                                             "ClientIPAddress"       = $Record.ClientIPAddress
                                             "UserAgent"             = $Record.UserAgent
                                             "ClientInfoString"      = $Record.ClientInfoString
+                                            "ActorInfoString"       = $Record.ActorInfoString
                                             "City"                  = $City
                                             "Region"                = $Region
                                             "Country"               = $Country
@@ -4237,10 +4258,10 @@ if (Test-Path "$($IPinfo)")
                                     param($WorkSheet)
                                     # BackgroundColor and FontColor for specific cells of TopRow
                                     $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                                    Set-Format -Address $WorkSheet.Cells["A1:AC1"] -BackgroundColor $BackgroundColor -FontColor White
-                                    # HorizontalAlignment "Center" of columns A-D and F-AC
+                                    Set-Format -Address $WorkSheet.Cells["A1:AD1"] -BackgroundColor $BackgroundColor -FontColor White
+                                    # HorizontalAlignment "Center" of columns A-D and F-AD
                                     $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
-                                    $WorkSheet.Cells["F:AC"].Style.HorizontalAlignment="Center"
+                                    $WorkSheet.Cells["F:AD"].Style.HorizontalAlignment="Center"
 
                                     # Iterating over the Application-Blacklist HashTable
                                     foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
@@ -4253,11 +4274,11 @@ if (Test-Path "$($IPinfo)")
                                     # Iterating over the ASN-Blacklist HashTable
                                     foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
                                     {
-                                        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$O1)))' -f $ASN
-                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                                        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$P1)))' -f $ASN
+                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
 
-                                        $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$O1))),$R1<>"")' -f $ASN
-                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["R:R"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
+                                        $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$P1))),$S1<>"")' -f $ASN
+                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["S:S"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
                                     }
 
                                     # Iterating over the Country-Blacklist HashTable
@@ -4295,9 +4316,10 @@ if (Test-Path "$($IPinfo)")
 
                                     # ConditionalFormatting - Operations
                                     $Cells = "D:D"
-                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Change user password.",$D1)))' -BackgroundColor Yellow # Changed user password
-                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Reset user password.",$D1)))' -BackgroundColor $Green # Administrator resets the password for a user.
-                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Update StsRefreshTokenValidFrom Timestamp.",$D1)))' -BackgroundColor $Green # Revoke Sessions --> Check 'ObjectId' for UPN
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Change user password.",$D1)))' -BackgroundColor $Green # Changed user password
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Disable account.",$D1)))' -BackgroundColor $Green # Administrator blocks sign-ins
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Reset user password.",$D1)))' -BackgroundColor $Green # Administrator resets the password for a user
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Update StsRefreshTokenValidFrom Timestamp.",$D1)))' -BackgroundColor $Green # Revoke Sessions --> Check 'ObjectId' for targeted UPN
 
                                     # ConditionalFormatting - ClientInfoString
                                     $Cells = "I:I"
@@ -4313,7 +4335,7 @@ if (Test-Path "$($IPinfo)")
                                     }
 
                                     # ConditionalFormatting - BrowserType
-                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["X:X"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$X1)))' -BackgroundColor Red
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["Y:Y"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$Y1)))' -BackgroundColor Red
 
                                     }
                                 }
@@ -4389,6 +4411,7 @@ if (Test-Path "$($IPinfo)")
                                             "ClientIPAddress"       = $Record.ClientIPAddress
                                             "UserAgent"             = $Record.UserAgent
                                             "ClientInfoString"      = $Record.ClientInfoString
+                                            "ActorInfoString"       = $Record.ActorInfoString
                                             "City"                  = $City
                                             "Region"                = $Region
                                             "Country"               = $Country
@@ -4435,10 +4458,10 @@ if (Test-Path "$($IPinfo)")
                                     param($WorkSheet)
                                     # BackgroundColor and FontColor for specific cells of TopRow
                                     $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                                    Set-Format -Address $WorkSheet.Cells["A1:AJ1"] -BackgroundColor $BackgroundColor -FontColor White
-                                    # HorizontalAlignment "Center" of columns A-D and F-AJ
+                                    Set-Format -Address $WorkSheet.Cells["A1:AK1"] -BackgroundColor $BackgroundColor -FontColor White
+                                    # HorizontalAlignment "Center" of columns A-D and F-AK
                                     $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
-                                    $WorkSheet.Cells["F:AJ"].Style.HorizontalAlignment="Center"
+                                    $WorkSheet.Cells["F:AK"].Style.HorizontalAlignment="Center"
 
                                     # LETHAL-037: Iterating over the Application-Blacklist HashTable
                                     foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
@@ -4451,11 +4474,11 @@ if (Test-Path "$($IPinfo)")
                                     # LETHAL-038: Iterating over the ASN-Blacklist HashTable
                                     foreach ($ASN in $AsnBlacklist_HashTable.Keys)
                                     {
-                                        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$O1)))' -f $ASN
-                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                                        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$P1)))' -f $ASN
+                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
 
-                                        $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$O1))),$R1<>"")' -f $ASN
-                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["R:R"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
+                                        $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$P1))),$S1<>"")' -f $ASN
+                                        Add-ConditionalFormatting -Address $WorkSheet.Cells["S:S"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
                                     }
 
                                     # LETHAL-039: Iterating over the Country-Blacklist HashTable
@@ -4509,7 +4532,7 @@ if (Test-Path "$($IPinfo)")
                                     }
 
                                     # ConditionalFormatting - BrowserType
-                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["X:X"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$X1)))' -BackgroundColor Red
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["Y:Y"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$Y1)))' -BackgroundColor Red
 
                                     }
                                 }
@@ -7534,6 +7557,67 @@ if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\UserLoggedIn.csv")
             # 72782ba9-4490-4f03-8d82-562370ea3566 # Office 365 (EvilProxy)
             # 00000002-0000-0ff1-ce00-000000000000 # Office 365 Exchange Online (Naked Pages, SakaiPages)
 
+            # Tycoon 2FA
+            # Implementation: Synchronous Relay
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS9009, AS29802
+
+            # Storm-1167
+            # Implementation: Synchronous Relay
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS132203, AS19871
+
+            # NakedPages
+            # Implementation: Reverse Proxy
+            # AppId: 00000002-0000-0ff1-ce00-000000000000 (Office 365 Exchange Online)
+            # AppId: 72782ba9-4490-4f03-8d82-562370ea3566 (Office365)
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS36352, AS215540, AS401120, AS149440, AS14061
+
+            # Sneaky 2FA
+            # Implementation: Synchronous Relay
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS14061, AS14956, AS36352, AS58329, AS39378
+
+            # EvilProxy
+            # Implementation: Reverse Proxy
+            # AppId: 72782ba9-4490-4f03-8d82-562370ea3566 (Office365)
+            # Top ASN: AS14061, AS63949, AS14956, AS401120, AS399629
+
+            # Evilginx
+            # Implementation: Reverse Proxy
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS16509, AS14061, AS22612, AS47583, AS14956
+
+            # Saiga 2FA
+            # Implementation: Synchronous Relay
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS36352, AS9009, AS47583, AS23470, AS16276
+
+            # Greatness
+            # Implementation: Synchronous Relay
+            # 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS16509
+
+            # Mamba 2FA
+            # Implementation: Synchronous Relay
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: IPRoyal Proxies (https://iproyal.com/ --> IPROYAL_PROXY)
+            # AS211373 - Simoresta UAB, IPRoyal Proxy
+            # AS211415 - Karolio IT Paslaugos UAB
+            # AS211440 - Karolio IT Paslaugos UAB
+            # AS212669 - Karolio IT Paslaugos UAB
+
+            # Gabagool
+            # Implementation: Synchronous Relay
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS174
+
+            # CEPHAS
+            # Implementation: Synchronous Relay
+            # AppId: 4765445b-32c6-49b0-83e6-1d93765276ca (OfficeHome)
+            # Top ASN: AS202015, AS14061, AS399629, AS36352, AS20473, AS14956
+
             # DeviceProperties
             $Count = ($Data | Where-Object { $_.SessionId -eq "$SessionId" } | Where-Object { $_.DeviceId -ne "" } | Select-Object DeviceId -Unique | Measure-Object).Count
             if ($Count)
@@ -7924,6 +8008,7 @@ if ($Count -gt 0)
             ClientAppId       = $AuditData.ClientAppId
             ClientIPAddress   = $AuditData.ClientIPAddress
             ClientInfoString  = $AuditData.ClientInfoString
+            ActorInfoString   = $AuditData.ActorInfoString
             ExternalAccess    = $AuditData.ExternalAccess
             InternalLogonType = $AuditData.InternalLogonType
             LogonType         = $AuditData.LogonType
@@ -7969,14 +8054,14 @@ if ($Count -gt 0)
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
         $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:AI1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-AB and AE-AI
-        $WorkSheet.Cells["A:AB"].Style.HorizontalAlignment="Center"
-        $WorkSheet.Cells["AE:AI"].Style.HorizontalAlignment="Center"
-        # HorizontalAlignment "Right" of column AD
-        $WorkSheet.Cells["AD:AD"].Style.HorizontalAlignment="Right"
-        # HorizontalAlignment "Center" of header of column AD
-        $WorkSheet.Cells["AD1:AD1"].Style.HorizontalAlignment="Center"
+        Set-Format -Address $WorkSheet.Cells["A1:AJ1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns A-AC and AF-AJ
+        $WorkSheet.Cells["A:AC"].Style.HorizontalAlignment="Center"
+        $WorkSheet.Cells["AF:AJ"].Style.HorizontalAlignment="Center"
+        # HorizontalAlignment "Right" of column AE (Multi-Line)
+        $WorkSheet.Cells["AE:AE"].Style.HorizontalAlignment="Right"
+        # HorizontalAlignment "Center" of header of column AE (Multi-Line)
+        $WorkSheet.Cells["AE1:AE1"].Style.HorizontalAlignment="Center"
         }
     }
 
@@ -7985,6 +8070,36 @@ if ($Count -gt 0)
 
     # Importing 'MailItemsAccessed.csv'
     $MailItemsAccessed = Import-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\MailItemsAccessed.csv" -Delimiter "," -Encoding UTF8
+
+    # ActorInfoString (Stats)
+    $Total = (Import-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\MailItemsAccessed.csv" -Delimiter "," | Select-Object ActorInfoString | Where-Object {$_.ActorInfoString -ne '' } | Measure-Object).Count
+    if ($Total -ge "1")
+    {
+        $Stats = Import-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\MailItemsAccessed.csv" -Delimiter "," -Encoding UTF8 | Where-Object {$_.ActorInfoString -ne '' } | Group-Object ActorInfoString | Select-Object @{Name='ActorInfoString'; Expression={$_.Name}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+        $Stats | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\Stats\ActorInfoString.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ActorInfoString" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns B-C
+        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+        }
+    }
+
+    # AggregatedFolders (Stats)
+    $Total = ($MailItemsAccessed | Select-Object Folder | Measure-Object).Count
+    if ($Total -ge "1")
+    {
+        $Stats = $MailItemsAccessed | Group-Object Folder | Select-Object @{Name='Folder'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+        $Stats | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\Stats\AggregatedFolders.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AggregatedFolders" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns B-C
+        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+        }
+    }
 
     # AppId (Stats)
     $Total = ($MailItemsAccessed | Select-Object AppId | Measure-Object).Count
@@ -8049,21 +8164,6 @@ if ($Count -gt 0)
         # ConditionalFormatting
         Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=OWA;Action=ViaProxy",$A1)))' -BackgroundColor Red # AiTM Server
         Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client",$A1)))' -BackgroundColor Red # eM Client
-        }
-    }
-
-    # AggregatedFolders (Stats)
-    $Total = ($MailItemsAccessed | Select-Object Folder | Measure-Object).Count
-    if ($Total -ge "1")
-    {
-        $Stats = $MailItemsAccessed | Group-Object Folder | Select-Object @{Name='Folder'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
-        $Stats | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\Stats\AggregatedFolders.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AggregatedFolders" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns B-C
-        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
     }
 
@@ -8455,6 +8555,7 @@ if ($Count -gt 0)
                 "ASN"               = $ASN
                 "OrgName"           = $OrgName
                 "ClientInfoString"  = $Record.ClientInfoString
+                "ActorInfoString"   = $Record.ActorInfoString
                 "InternetMessageId" = $Record.InternetMessageId
                 "Folder"            = $Record.Folder
                 "OperationCount"    = $Record.OperationCount
@@ -8476,10 +8577,10 @@ if ($Count -gt 0)
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
             $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-            Set-Format -Address $WorkSheet.Cells["A1:X1"] -BackgroundColor $BackgroundColor -FontColor White
-            # HorizontalAlignment "Center" of columns A-R and T-X
-            $WorkSheet.Cells["A:R"].Style.HorizontalAlignment="Center"
-            $WorkSheet.Cells["T:X"].Style.HorizontalAlignment="Center"
+            Set-Format -Address $WorkSheet.Cells["A1:Y1"] -BackgroundColor $BackgroundColor -FontColor White
+            # HorizontalAlignment "Center" of columns A-S and U-Y
+            $WorkSheet.Cells["A:S"].Style.HorizontalAlignment="Center"
+            $WorkSheet.Cells["U:Y"].Style.HorizontalAlignment="Center"
                     
             # ConditionalFormatting - AppDisplayName
             Add-ConditionalFormatting -Address $WorkSheet.Cells["I:I"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third-Party Application",$I1)))' -BackgroundColor Yellow
@@ -8489,7 +8590,7 @@ if ($Count -gt 0)
             Add-ConditionalFormatting -Address $WorkSheet.Cells["R:R"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client",$R1)))' -BackgroundColor Red # eM Client
 
             # ConditionalFormatting - InternetMessageId
-            Add-ConditionalFormatting -Address $WorkSheet.Cells["S:S"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("<em",$S1)))' -BackgroundColor Red # Messages sent by eM Client (Inbound and Outbound)
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["T:T"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("<em",$T1)))' -BackgroundColor Red # Messages sent by eM Client (Inbound and Outbound)
 
             # Iterating over the Application-Blacklist HashTable
             foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
@@ -8505,15 +8606,15 @@ if ($Count -gt 0)
                 $ConditionValue = 'NOT(ISERROR(FIND("{0}",$P1)))' -f $ASN
                 Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
 
-                $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$P1))),$V1<>"")' -f $ASN
-                Add-ConditionalFormatting -Address $WorkSheet.Cells["V:V"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
+                $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$P1))),$W1<>"")' -f $ASN
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["W:W"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
             }
 
             # Iterating over the Country-Blacklist HashTable
             foreach ($Country in $CountryBlacklist_HashTable.Keys) 
             {
-                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$O1)))' -f $Country
-                Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$N1)))' -f $Country
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["N:O"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
             }
 
             }
@@ -8596,8 +8697,9 @@ if ($Count -gt 0)
                 Write-Host "[Alert] $Count Third-Party Application(s) detected (Accessed Mailbox Items: $InternetMessageIds)" -ForegroundColor Yellow
             }
 
-            # 464e0e4d-676a-4c3b-9f81-2ed9b2a9acd2 - ???
+            # 464e0e4d-676a-4c3b-9f81-2ed9b2a9acd2 - ??? --> Seen Frequently
             # 9fd38622-d9b4-4401-b1b9-1ce14c5e435a - ???
+            # 3153c72b-35a8-465b-84d8-dfb56651836a - CodeTwo Email Signatures 365 (Legacy: CodeTwo EmailSignatures for Office 365 Sent Items Update)
         }
 
         # ASN (Stats)
@@ -8867,6 +8969,8 @@ if ($Count -gt 0)
             "ModifiedProperties" = $ModifiedProperties -join "`r`n"
             "Count"              = ($ModifiedProperties | Measure-Object).Count
 
+            "SessionId"          = $AuditData.SessionId
+
             # AppAccessContext
             "IssuedAtTime"       = $AppAccessContext.IssuedAtTime | ForEach-Object {$_ -replace 'T',' '} # Indicates when the authentication for this Microsoft Entra token occurred.
             "UniqueTokenId"      = $AppAccessContext.UniqueTokenId # Contains the unique identifier for the token passed during sign-in. This identifier can be used to correlate the token request with the sign-in.
@@ -8885,10 +8989,10 @@ if ($Count -gt 0)
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
         $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:AM1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-AH and AJ-AM
+        Set-Format -Address $WorkSheet.Cells["A1:AN1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns A-AH and AJ-AN
         $WorkSheet.Cells["A:AH"].Style.HorizontalAlignment="Center"
-        $WorkSheet.Cells["AJ:AM"].Style.HorizontalAlignment="Center"
+        $WorkSheet.Cells["AJ:AN"].Style.HorizontalAlignment="Center"
 
         # Iterating over the ASN-Blacklist HashTable
         foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
@@ -9388,8 +9492,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU4+ba+BmU/gbzF+bNPGp8klLn
-# C4iggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUICRVopqKAFXs5nZeBPrMoJG3
+# hamggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -9591,33 +9695,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBRACFAQ4YETzmh/t1fjsd/gO1GTxTANBgkqhkiG9w0B
-# AQEFAASCAgDFTuelXZfngOQK4h3uwxsEX49r/cxRCTVRdIj99AzpATIEon2r76yL
-# P9NPRzA2EMPG24Nf1DVHrDKRyZmWvuFGUg0DuGVepwLFeR6zCdv/QrzbowwDGyC9
-# 1D5LyEgcz3e5oHbXIkQ9ZgrZPY+NW5x1pyy+OLzXG1yf+29CDSdIifCgA1YvZB69
-# W3vvWhmkxrKYfuwuUqOtFsg+UUyzeakO38GXOfRHI6GCaKfYA7QY7Kb4CSK5pM2P
-# XHVY5G1R67BTktLM+VmQ+/Qi9eJXD7gAz8CmKM/sWvW8S62f9/epoHs/ZZiP/l9C
-# T0LleuvayEWdCVbtE/AZDXAJNZCXkhYhi51q7zHp4v4MSxK0UFuEvBF5hqFeKZm6
-# 3zI+selxerbQeOdce5VLrrM/rS4mltS6j+O4mxOzCCqMG36nk6sCfAc5CR0DCMXH
-# YInHpQGi1t9muYbIhZ5U7CMV71TZxxXE7lVAAbxXysZJz+EHbPCkYEW1l7kdCMgo
-# YykfdUiUPhsSDX1LKnk1IUg2IpGv83knsfv6SyRqSEptX+FBzwO756MPBpGikeom
-# Gq841XDDH3ZTBg6VktQVePkoXWy7rpwg4jAatN9g9lA7bicOnvP5e290FLYYOFrH
-# WfQ6UCZcoidU3beKpNqurwTDpIpVi9r4yx3d7DFSg/5jX8UXANvFe6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBSnyCMub+NZsTN9OWJ3CJQ9xmVUfzANBgkqhkiG9w0B
+# AQEFAASCAgBYbp3OMI99oB0DZuevo27EiKI3vap7x2Ganl5Dz7tW/bE+popM2X/x
+# UkQptBT2c5mKwjejdDDCc/bwWopmpHvnPVxKvtBLt0d8JmuZPJ4wMt895oKdS7Cl
+# KZrCx/BvxSLGlBRod3NLvEmaRzqKjFhepvX5ZwmqM2b6JaOpTuqS+QElGCHGx62w
+# Z8yCDD4ff5VvdJCmA21zWQR694r51CkXzIikMuHc5FCVh2980HgGFYT6ckgbBy9u
+# t6Y4dYAIFo6kS5YokQzYAHSFJVf8sXJ9Ln3Z/Py2VZlRkpMqbv9EO+drP25tq5/y
+# QZaKCxaPI2+b6xYEtk8jtAMW97fwfHe3NPijC4U7ZNSQtOMXyx6kTTCJLB0W96FD
+# jHOLh54Xp9/OcswTimicG+KlUWlLoLRGh5ZbrmMtsGS57jcjJ1/zCQrLj0z/XFGg
+# HOjuisboNC/FvPmnJyaaU9QU3i7BuRL5DEjG6ZQC0+fpi+cTiaOo4pBKZ2GV4rCM
+# 55BLKfkjRe5zDJdAqQJKfWWKpMeIua/oxFWU+KpPUzLSbBiTbD51NbY5J8wArdNV
+# ms7ws7NBybUVQiP2HbQMcTznxNBRSy/pqcTsQR0SSLl7pkgH+xFKem6WQ1ydf56C
+# AHyfujjznae4oSwJ1sFC27R4k9oMzOepYiqLC5LgfaxA73Z8uwv/LqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDYwOFowPwYJKoZIhvcNAQkEMTIEMDpA/0N+ceB7tsiji2a5fZ1ZvqCW
-# KbAlh3ghgOrgxdZ18Am3JV4cPNaeANmPvwv+aTANBgkqhkiG9w0BAQEFAASCAgC/
-# DA0N9585FHhRwCOIJmrhc9XOiLuclQfFy/gscc1VUy+uLSsyPqfsaSWq6sFNhVnd
-# sA8z6d121uodB2UFkDh+AjRf2PIWNm+wTrsGcGHqwQggRNb0jtDd5Wwd9o4e517s
-# yMSTcNQJ5x2C5tMastqxUMEc7LWfLiR3SSWSxXNWSyWgOhTFh3TghrA6hNU0qfa8
-# 3Q6XBxfFRKtBl5Wqa3/5zdWF+rMVsCZWWEsWZZNuY+yfD5uMXSbqxsEme3e9KQww
-# WXd1ef6FzlepeRxox4+DQMC7Tp3xhNUf5G//zt3dDPenXRuLDp7yvX5DFODgTUBE
-# LPDD13fMXCxMhhXtEClZf7LYkrfm7AD6zJ9YJMdTL9xWOsqHnPheDR8N/iQutYyG
-# 9TykjCJowR2dnXJarAqLGeequvxWnrbPGiPAIA6SR3h9LKnEb5GaCFbNq0Svin07
-# OjYP9jPbEW43XXnl2Ni/noIjbbHp3+VQwl7INqnuSVk3N0ow5ZkpGlCcu7H3LZ5d
-# NBo2440yomyoI92bjjpahouHq+8i0ao5xMeGdoZM6ypc7V6G7L8kl8jROYLtR7LA
-# XTrqJ31vD/fUHxgQ9dEMi7c0AZn48U+e3sKRaeSnFtuvWABZ0qcmkcV0RY3s3ms5
-# MlzMZ68WvxRBk5bmMYj6OguoBU23/lQRkgH1eEW8nQ==
+# MDcyNDA0NTMyNVowPwYJKoZIhvcNAQkEMTIEMAqYbRtWoOmxT3GTyzQLv1Zc/jri
+# QuwNCKckdPSPD4KpZDjvAXlVZ/b7Kq4HQxToHzANBgkqhkiG9w0BAQEFAASCAgBi
+# NAXT+sHfNUEtuNyjFcDnQNUXsqGRMse4mFDHCRoqjJCbbJnWshA7i3Au5e9HPYDd
+# tp6xLeum0UkYOF87zE3QTiKxO0kB4b7DzQMCS4fSlfa61z6pFzEg26Nr3y/PNS1v
+# p4NE3FdYBB7n8nh90R+KS3YW1KimkKajx9Xh1ko/ifRjUib/C++AJagm3VH6rA28
+# p6T1D3xaTRXI/0Uuc/be8dRt+GaXB948Xid+FpjhmONXygKRDlgvyYyn8F0caT7+
+# UG8jFhWhvFlJmZvT4BlGHzANcLCSSleBz7Fc2p1Oayodkz07Qwl9I1u3QmwgOzct
+# fNZN/m3ziobdR4+AFd5KrVI/rHukszvgcS9rpDKgN1a8xiRIM6PTw45hC7hHZGnd
+# ZWZlzZKCJCdqnSOJE5I/cXaoXnRkxChvSfKfsGt+O7kNuO3lHBR+IZ4irC+SQal2
+# 4+lrlyCatxbz6GLzKfg1b41TiXiPLO7YUT0VkY4m+p+FdiMu7jItYSBHKoPFycqo
+# 6jXXBE9SqknpsG3WN6+1YA6CMZ+5JHPxeXh8n0AM9FoYvrzoC83Jxzs++mwNvPUt
+# nqdBJGEu16xusLc5ITUWoTrHismDqYI3zt9TU4Oo4mGvLRArdq86sf2KxnYbCV1F
+# Eus69g34QvyWWTQAYN5+L2iMiy2x4aBLd+I9MjcSdg==
 # SIG # End signature block

@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -157,14 +157,18 @@ if (Test-Path "$FilePath")
     }
 }
 
-# Configuration File
-if(!(Test-Path "$PSScriptRoot\Config.ps1"))
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
 {
-    Write-Host "[Error] Config.ps1 NOT found." -ForegroundColor Red
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
 }
 else
 {
-    . "$PSScriptRoot\Config.ps1"
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
 }
 
 #endregion Declarations
@@ -269,6 +273,8 @@ $script:AnalysisDate = [datetime]::Now.ToUniversalTime().ToString("yyyy-MM-dd HH
 Write-Output "Analysis date: $AnalysisDate UTC"
 Write-Output ""
 
+# Initializing Blacklists
+
 # Create HashTable and import 'Application-Blacklist.csv'
 $script:ApplicationBlacklist_HashTable = [ordered]@{}
 if (Test-Path "$SCRIPT_DIR\Blacklists\Application-Blacklist.csv")
@@ -276,6 +282,10 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\Application-Blacklist.csv")
     if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\Application-Blacklist.csv" -MaxLines 2)
     {
         Import-Csv "$SCRIPT_DIR\Blacklists\Application-Blacklist.csv" -Delimiter "," | ForEach-Object { $ApplicationBlacklist_HashTable[$_.AppId] = $_.AppDisplayName,$_.Severity }
+
+        # Count Ingested Properties
+        $Count = $ApplicationBlacklist_HashTable.Count
+        Write-Output "[Info]  Initializing 'Application-Blacklist.csv' Lookup Table ($Count) ..."
     }
 }
 
@@ -286,6 +296,10 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv")
     if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv" -MaxLines 2)
     {
         Import-Csv "$SCRIPT_DIR\Blacklists\ASN-Blacklist.csv" -Delimiter "," | ForEach-Object { $AsnBlacklist_HashTable[$_.ASN] = $_.OrgName,$_.Info }
+
+        # Count Ingested Properties
+        $Count = $AsnBlacklist_HashTable.Count
+        Write-Output "[Info]  Initializing 'ASN-Blacklist.csv' Lookup Table ($Count) ..."
     }
 }
 
@@ -296,11 +310,15 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv")
     if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv" -MaxLines 2)
     {
         Import-Csv "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv" -Delimiter "," | ForEach-Object { $CountryBlacklist_HashTable[$_."Country Name"] = $_.Country }
+
+        # Count Ingested Properties
+        $Count = $CountryBlacklist_HashTable.Count
+        Write-Output "[Info]  Initializing 'Country-Blacklist.csv' Lookup Table ($Count) ..."
     }
 }
 
 # Create HashTable and import 'UserAgent-Blacklist.csv'
-$script:UserAgentBlacklist_HashTable = [ordered]@{}
+$script:UserAgentBlacklist_HashTable = New-Object System.Collections.Hashtable
 if (Test-Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv")
 {
     if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -MaxLines 2)
@@ -349,7 +367,7 @@ if (!($Extension -eq ".json" ))
 # Check IPinfo CLI Access Token 
 if ("$Token" -eq "access_token")
 {
-    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.ps1'" -ForegroundColor Red
+    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.json'" -ForegroundColor Red
     Write-Host ""
     Stop-Transcript
     $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -1076,16 +1094,6 @@ if (Test-Path "$($IPinfo)")
                                 Write-Output "[Info]  Initializing 'IPinfo-Custom.csv' Lookup Table ($Count) ..."
                             }
                         }
-
-                        # Initializing Blacklists
-                        $Count = $ApplicationBlacklist_HashTable.Count
-                        Write-Output "[Info]  Initializing 'Application-Blacklist.csv' Lookup Table ($Count) ..."
-
-                        $Count = $AsnBlacklist_HashTable.Count
-                        Write-Output "[Info]  Initializing 'ASN-Blacklist.csv' Lookup Table ($Count) ..."
-
-                        $Count = $CountryBlacklist_HashTable.Count
-                        Write-Output "[Info]  Initializing 'Country-Blacklist.csv' Lookup Table ($Count) ..."
 
                         # Entra Audit Logs
 
@@ -2175,6 +2183,122 @@ if ($Count -ge 1)
     }
 }
 
+# LETHAL-015: Suspicious Cloud Device Registration [T1098.005]
+# https://www.elastic.co/security-labs/entra-id-oauth-phishing-detection
+# https://github.com/elastic/detection-rules/blob/43b0f0ada7e290bbbc0d4b1d53ed158e7bfbe75c/rules/integrations/azure/persistence_entra_id_suspicious_cloud_device_registration.toml
+# Detects a sequence of events in Microsoft Entra ID indicative of a suspicious cloud-based device registration, potentially using ROADtools.
+# This behavior involves adding a device via the Device Registration Service, followed by the assignment of registered users and owners — a pattern consistent with techniques used to establish persistence or acquire a Primary Refresh Token (PRT). 
+# ROADtools, a popular red team toolkit, often leaves distinct telemetry signatures such as the 'Microsoft.OData.Client' user agent and specific OS version values. 
+# These sequences are uncommon in typical user behavior and may reflect abuse of device trust for session hijacking or silent token replay
+$Step1 = $Hunt`
+| Where-Object { $_.Activity -eq 'Add device' }`
+| Where-Object { $_.Status -eq 'success' }`
+| Where-Object { $_.AppDisplayName -eq 'Device Registration Service' }`
+| Where-Object { $_.UserAgent -match 'Microsoft.OData.Client/' }`
+| Where-Object { $_.Target1ModifiedProperty2Name -match 'CloudAccountEnabled' }
+
+# 1. Add device activity from the Device Registration Service using a 'Microsoft.OData.Client/*' User-Agent.
+# 2. Assignment of a registered user (with an enterprise registration URN to the device).
+# 3. Assignment of a registered owner to the device.
+# 4. All events must share the same correlation ID and occur within a one-minute window, strongly suggesting automation or script-driven registration rather than legitimate user behavior.
+
+$Count = (($Step1 | Measure-Object).Count)
+
+if ($Count -ge 1)
+{
+    $CorrelationIds = $Step1 | Select-Object -ExpandProperty CorrelationId
+    
+    ForEach($CorrelationId in $CorrelationIds)
+    {
+        # Step 2 + 3
+        $Step2 = $Hunt | Where-Object { $_.CorrelationId -eq "$CorrelationId" } | Where-Object {($_.Activity -eq "Add registered users to device" -and $_.Status -eq "success")} | Select-Object -ExpandProperty CorrelationId
+        
+        if ($Step2)
+        {
+            $Step3 = $Hunt | Where-Object { $_.CorrelationId -eq "$Step2" } | Where-Object {($_.Activity -eq "Add registered owner to device" -and $_.Status -eq "success")}| Select-Object -ExpandProperty CorrelationId
+        }
+        else
+        {
+            $Step3 = ""
+        }
+
+        if ($Step3)
+        {
+            # Event Sequence
+            $Events = $Hunt`
+            | Where-Object { $_.CorrelationId -eq "$Step3" }`
+            | Where-Object { $_.Activity -eq "Add device" -or $_.Activity -eq "Add registered users to device" -or $_.Activity -eq "Add registered owner to device" }`
+            | Sort-Object { $_.ActivityDateTime -as [datetime] }
+            $First = ($Events | Select-Object -First 1).ActivityDateTime
+            $Last  = ($Events | Select-Object -Last 1).ActivityDateTime
+            $Start = Get-Date $First
+            $End   = Get-Date $Last
+
+            # TimeSpan
+            $MaxSpan  = [timespan]'00:01:00' # 1 Minute
+            $Duration = [math]::Abs(($Start - $End).Ticks)
+            $TimeSpan = $Duration -le $MaxSpan.Ticks
+            #$Seconds  = ([timespan]$Duration).TotalSeconds
+            #Write-Output "$CorrelationId : $Duration ($Seconds)"
+
+            if ($TimeSpan -eq $true)
+            {
+                $Data += $Hunt | Where-Object { $_.CorrelationId -eq "$CorrelationId" }
+            }
+        }
+    }
+
+    $Count = (($Data | Where-Object { $_.Activity -eq "Add device" } | Measure-Object).Count)
+    if ($Count -ge 1)
+    {
+        Write-Host "[Alert] Suspicious Cloud Device Registration detected ($Count)" -ForegroundColor Red
+        New-Item "$OUTPUT_FOLDER\EntraAuditLogs\Analytics\CSV" -ItemType Directory -Force | Out-Null
+        New-Item "$OUTPUT_FOLDER\EntraAuditLogs\Analytics\XLSX" -ItemType Directory -Force | Out-Null
+
+        # CSV
+        $Data | Export-Csv -Path "$OUTPUT_FOLDER\EntraAuditLogs\Analytics\CSV\Suspicious-Cloud-Device-Registration.csv" -NoTypeInformation -Encoding UTF8
+
+        # XLSX
+        if (Test-Path "$OUTPUT_FOLDER\EntraAuditLogs\Analytics\CSV\Suspicious-Cloud-Device-Registration.csv")
+        {
+            if(Test-Csv -Path "$OUTPUT_FOLDER\EntraAuditLogs\Analytics\CSV\Suspicious-Cloud-Device-Registration.csv" -MaxLines 2)
+            {
+                $IMPORT = Import-Csv "$OUTPUT_FOLDER\EntraAuditLogs\Analytics\CSV\Suspicious-Cloud-Device-Registration.csv" -Delimiter ","
+                $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraAuditLogs\Analytics\XLSX\Suspicious-Cloud-Device-Registration.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,3 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Device Registrations" -CellStyleSB {
+                param($WorkSheet)
+                # BackgroundColor and FontColor for specific cells of TopRow
+                $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
+                Set-Format -Address $WorkSheet.Cells["A1:BI1"] -BackgroundColor $BackgroundColor -FontColor White
+                # HorizontalAlignment "Center" of columns A-L and N-BI
+                $WorkSheet.Cells["A:G"].Style.HorizontalAlignment="Center"
+                $WorkSheet.Cells["I:BI"].Style.HorizontalAlignment="Center"
+
+                # ConditionalFormatting - Activity
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Add device",$J1)))' -BackgroundColor Red
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Add registered users to device",$J1)))' -BackgroundColor Red # Addition of a registered user with an `enterprise registration`URN.
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["J:J"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Add registered owner to device",$J1)))' -BackgroundColor Red # Assignment of a registered owner to the device.
+
+                # ConditionalFormatting - AppDisplayName
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["E:E"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Device Registration Service",$E1)))' -BackgroundColor Red
+
+                # ConditionalFormatting - UserAgent
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["BD:BD"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Microsoft.OData.Client/",$BD1)))' -BackgroundColor Red
+
+                # ConditionalFormatting - Target1ModifiedProperty2Name
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["AE:AE"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("CloudAccountEnabled",$AE1)))' -BackgroundColor Red
+
+                # ConditionalFormatting - Target1ModifiedProperty3NewValue
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["AJ:AJ"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("urn:ms-drs:enterpriseregistration.windows.net",$AJ1)))' -BackgroundColor Red
+
+                # ConditionalFormatting - Target1ModifiedProperty4NewValue
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["AM:AM"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("10.0.19041.928",$AM1)))' -BackgroundColor Red # ROADtools Token eXchange (roadtx)
+
+                }
+            }
+        }
+    }
+}
+
 # Microsoft Entra Connect Sync
 # Microsoft Entra Connect Sync allows establishing hybrid identity scenarios by interconnecting on-premises Active Directory and Entra ID and leveraging synchronisation features in both directions. 
 # As you might already know, this brings potential for abuse of the assigned permissions to the involved service accounts and permissions of this service.
@@ -2252,8 +2376,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQULbiZMVFmXPArRhBKOiH2c2d9
-# 15aggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUucX8Y10CqaX2tevFscAIS/Er
+# yYqggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -2455,33 +2579,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBSMacbMCUXou+xfVVqvY3DSPRV6dTANBgkqhkiG9w0B
-# AQEFAASCAgCYXodlNRkb4ZXUCcYb+dOfXUmGbHHDg8wxyWYLqpuZH13PJ/Sjt/Aw
-# 7MA/N5debgiKyqGDiIjYwAAIBmUHIw+IkjNddPNRypMJtyV9Ok4lG7qX3I5cd8Em
-# BqcIExbc8N1CwQpeCV6GeR9Ti8M26t6IWSD5kAJwwtruZ1+pdxMgsLITPjygA8K0
-# KzcfY61F652IrxHlNjaXQXmVMeYDA0tLkPmw/uygcEW4RrKBm13rxuq83VsGLwcN
-# pnbxIJvdSN0JQAiAzfGQi50u49yKSxYUUDuJC6LQRvQq0XMcV7BBZD8ltTLHfY3V
-# AS9gkuYeamsfTZSJG2Z/EwfWC86TGsTj7wW6PzDRuwm/l2svARJaMjjtjxFj0EnU
-# G+gZsm6XsHcCgfFj3AD/IJ38xSGWppnedmybw5UZHbWdXANkXdhJUT78xFnTB/ap
-# bHjieW6mphfs4866zzBmldkerf2JXhDxuVlwCvxFqd0pOA7K7AEIxTlPnNBYUnbN
-# xYEQeYm2Vdl/RrX9/bI+SB/c0jQtEOd+GmbquTrEtXJ56EtsNPsR2VPvI8FxkGfg
-# hSqmz8uRGbTUCOaxT6BqTD/S2f8LRa3WQ3zTbRIbcM4tiZgFeOzg8h3/MJCsbwqq
-# W777l6hZfiqFsmxcyVoDIDJZdHLQVJLIo8YvB2XMbZHoyOyqyfTwNqGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTJijAxsbU8bR3OEOVYbMqvgdfwZjANBgkqhkiG9w0B
+# AQEFAASCAgA1JdjfSjh8sgZkCkJ1Qj3CP2SLtB6Rp1u3z99PLOncrX3Lby+uU2Gb
+# eom2QJUUKlk+yUHqA37hc8c+W9aN8AR/mVi2XfR41MnFd/bBCldeqXSE+p2xUM87
+# 5kioYx0+XOATPAtbQxXrHmwfcXVTtdZzZ3x6cvUDZ3TtWTFhLX+L33oXvMbhAfkl
+# 0t6nWzVNJHb1tAbssaAiOSqh7Htbzu2aJ2sD2cboi9E5LXDqlXtDIzHdfpYiMa5O
+# PMwUByRwtfvkoY0cjADwWnCK6Qw1ibQbC6WfsjvEoWGeQsMPzYB3V4omQwaBjtXp
+# B+WkdsP4tN34Jk6rFEQFFLre8i8IpshwiVzcCiU6rgthQh4wZJALH/BfqDmSwC5i
+# CTvtVdtNnFf1tXIZzh5OTWiiZOPAgVSPwduvQa93MeGzuncrQ73mDsrNF87XHTjF
+# k4sT4FtTASS1ZuCXm058nUZMwcEZjZ5CLKnzHz/krGrS1Pwof05+8ZUr1YCVoOY9
+# 2C+vnElEKbN1Butkc7Z/0Jdxmuf4cuAt9kBhPYk1+WOhgcz9Htj42IMVOpyd69o0
+# jgBpTVN5kFJTT21RRdzUrlQLucYG4c5rydwHzWHQb38cG6gC8qaGsvsrwMJ6SfI0
+# M2sfWopBEmOkaVEHMpX6qIrAXNopB3b5LUB4PRRfmKjoxDFrVdwH3KGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDUzNVowPwYJKoZIhvcNAQkEMTIEMIPSULrzxr6B9qtBi+JYd2SlEG9B
-# vzQoB2ZciZ2cF8riBVrX3pEk/8L0soVlH3tiMTANBgkqhkiG9w0BAQEFAASCAgDQ
-# +M7uXD4kVQLJVz/HmNgmEqbZoQrZ8ztczkzeVsYL7yVf/PPxA1rMl0YRvRCID4eL
-# cH2j0fHsdDQbmSNkgJzH91jcmlVBwX6t+MIO1Vt+3Ys1iSc+Ed97vadXyscgBZuA
-# XzcBd0nZjqZkc5zlkZnuTsq/ZA8v100K39mpawJ11aBi9MtbHVaxEA6PJij8pefh
-# bygXkW6m5522ZnWf9tIFHDAY6TgzOuDA6hsBOfUmbBzX3ecY/0RXt3FdrX3Sy+Nc
-# gdtym4lt1rSH2QT5hjlvPd6BVVW6doEUb4urvfY1NZ5UeqI0Kb3nqYDFHdXLxPyx
-# b8dSFtynM6uPIYT8ExeeW7KU81xRbL47IMrQb3RqBtft5D8AIL5nNoSBk6bwwQea
-# QjvMR5Eo2jDA8m2Gh+OrHp1ZWI60haYQM7+CxgGVBhEDUFgM/PRpgX50AZu64PxG
-# AoU78HBe8Y2MzmT6J2jKFs2pGSw+IsJRkPoNyhVFiGnmAZVB/QK+voWItH31jx8n
-# JWo0Yu0e75pnbwa+KVupXhCvQKB675kOL2kBzG3i1Rb+oo7SXPv+BhwCQz+ZllBK
-# +Deyk3gUcm+yprkVYl3klpLVqRQclCk8Md7QiXAL40ohm/4VhWNjVSf3t33+QrpU
-# bTJXKBtxiwnKyRzz7fPHLEOnkHJWKPVgrcbso8gS8g==
+# MDcyNDA0NTI1MVowPwYJKoZIhvcNAQkEMTIEMIXQ6B6DpZdOcVkjrJVB894O+ltQ
+# bIuYQFobunvB4OqePmU4MoRkV+rAmJT46KfPWTANBgkqhkiG9w0BAQEFAASCAgCe
+# RMMdJDOttPmFqqZ9WnnViD0Yazg3ptf1Sgk5iXMqyGkuvaNd60lh9sSx8skN4Sw4
+# LtqCfUneuoWDJMF5bw7vyQUPQkmOxJT8kFrhvQGrmcNBmMUZwCUw9HHUPecID4TX
+# jJJ1gVOXtu7evpngbZefOspoP0QfhnYt11MajfjNUxVbuYv2whFDfO9f3RYOcasY
+# 6q4NohTDqWJC2n4VsbYvnHuSKSYHzRcgIEdafVG7kdFh7H8ArhZzqnOkNDnZXNuE
+# Yx+kZChpq5pDzbWs1QXuW0kDdNJhO7sKxyNDOy9yUy8AdUV0YDdDdS6+H3cmPLe4
+# cri3xtOdS7LSF5WgXMR2IVlDLSbX4hBdhk/tlYOd8etD+mMljQNAzlHlIvylCiio
+# orKe0DlUfUEfYaoKEWVK7zlbDoV3Z4T6Lymd5Dml8zKt63a1eJFd6RDvKTdgWC4X
+# hXsBMwdPsWVVjV49E0E05y2eHkLluOLjrdFgqZC4+ANqdglG4aSMIg75FbWymmT6
+# MoJS+Th5wrAawYC+pcFfEdgikLZ+kb4lWE0F9WqhkGWKVT3Ex5wRq0r2Cap5tI8Y
+# 96m9zq8pPAiNdxhgHi7iGGZEZ9P7xq1TNNSv4r7PdgCOyXwmvKfxFxX2sxIDyiKa
+# ptacrjicjBhHNKXASHXKbejwuuDOEiTL0HtqpCXu0w==
 # SIG # End signature block

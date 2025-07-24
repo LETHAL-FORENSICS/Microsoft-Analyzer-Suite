@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -121,6 +121,20 @@ else
 
 # IPinfo CLI
 $script:IPinfo = "$SCRIPT_DIR\Tools\IPinfo\ipinfo.exe"
+
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
+{
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
+}
+else
+{
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
+}
 
 #endregion Declarations
 
@@ -265,7 +279,7 @@ if (Test-Path "$SCRIPT_DIR\Blacklists\Country-Blacklist.csv")
 }
 
 # Create HashTable and import 'UserAgent-Blacklist.csv'
-$script:UserAgentBlacklist_HashTable = [ordered]@{}
+$script:UserAgentBlacklist_HashTable = New-Object System.Collections.Hashtable
 if (Test-Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv")
 {
     if(Test-Csv -Path "$SCRIPT_DIR\Blacklists\UserAgent-Blacklist.csv" -MaxLines 2)
@@ -311,7 +325,7 @@ if (!($Extension -eq ".csv" ))
 # Check IPinfo CLI Access Token 
 if ("$Token" -eq "access_token")
 {
-    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.ps1'" -ForegroundColor Red
+    Write-Host "[Error] No IPinfo CLI Access Token provided. Please add your personal access token to 'Config.json'" -ForegroundColor Red
     Write-Host ""
     Stop-Transcript
     $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -940,8 +954,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUWq6FGwNVttmKmfvriInOyt7B
-# SdiggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUCEKxxXk17vWJodYXeLfcCyK1
+# hTqggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -1143,33 +1157,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBSDEdXm8rLoqnrU0X9lKxCWd0kKojANBgkqhkiG9w0B
-# AQEFAASCAgBIIXT2Fo8gNT4kDWratl6EguZauAlLzie/DtomYtgUwzyAviPOx10o
-# JSd2zAIvXnmt27GLjaPgzO6wBzGp89vTrnkRg2GzO27h0JPuE/j65P9KYXpJSMFk
-# KgDBY+vteDBfyKYs041z5GFwff6RvUJ1Nc1BeJbdSRKlryfLQ23yhlRJ+LCjIyuq
-# S0HM+Q79D1jk+g7gigbv5axxdUocVJsKHEjv3uJh3a7z3osqmg4gCDXU90FAvWj4
-# XOE0Wg//Gg6RckNY4hgMPNobrRJ+RY4oXO3ZnU0dpfnFusuKUtZQDtbfJElw1ACj
-# LFtX83APxS9untZPdVE3ArcTombbj6DKci1DjguKhdOyqY1PIlLOiOmvxiPz1ijv
-# dlta66NO0NuSRAWjoqmyKzrTE5PfcTwGocy4SyOELQuJaXGHNXz3iv6OhdjDEKLg
-# OS4CgTVlAhXsPmYsVijPD3PlVsREThZyhKhcrMc2N2GJDXbcQh67BYHly1gJlAbK
-# 6/1uuGljbCOZzt4UInmzBmsR1Rsq86N3rgETqBvZaow+sT7w0CzjTwZsNGFKpImo
-# 7Y8N15qIOyhAfMbtp4BT1cVvBhBs40D8wy6UWf5luETmkBeYTT6ZEJjhYc3batgf
-# elchrZbOcHvv+DxLGGxTY1T497I55+bVdT2rm3/JAu7V1XQE1+BcfKGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQIzEZ+tHlTAmnafr3gzUh/eK95fTANBgkqhkiG9w0B
+# AQEFAASCAgBeQ+cVNx9arnN2kZP17cASisF6g4C9au/gmjOf1x2go/buH24/hgHm
+# gfN/dJxNZzH6oHNLNxBVO4xAKIyZzI48biyY74pAutqQfwr/QRfLqnFK02/wELVX
+# JzGeZkQbQ6Cxri1BWXmvxm8rNU6JU+PD6NHFHjJpoudKaAGjGHRF/dDpYswAhxEr
+# dVF5BJMQOfamEy4FHc6jLeBE4O5PXnoetE3kfugYhADKoOFhDrNK/K8e5baKaYSq
+# V6iVvO6Ckb8I9DZNxjO9Vv7e8FBGfDZ7ZWlamSHOBQq44YVb636Rmysa1JFd09nF
+# 2fdN7bBfTGPGoS8TT1p9FDU6IDyMyI1/G72LbPG7W14BzR7PAmOYJkWo1PS9bfC5
+# 2EFocYWtGR+GdQx9HUK0SaHZb+F7qs6usdZXRhfE5DgsqePBmJEJsgaNPhAbixYf
+# K3Ao98D3u+MBLte55g0Av1RyE+YVDzi+0URJaquDVByMu9g9k8EwRenoFc0V2QL1
+# QxEWB5JlRUwKFCfpa20NgaaEjr/NsY4xRrIh5qDb12QGPuc2yhqZVY702SB2eLrK
+# f9oyiPMNj6J9Jhmf9oUMvoNV2UjRqessOMpq90zwL2iV2hbt84Z36bbvBzfeXLzw
+# 4fx7A2jsXTJMXgHqFCBdxzcGp6kGKTsannT7IDnNqCDSzW6hOTdMJqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA5MzAyM1owPwYJKoZIhvcNAQkEMTIEMJsGTgTremYI7G1DrW4cvaw4VPFl
-# Rz0OgZ018EFgl459qG4JsMROXw6NCrsegT25AjANBgkqhkiG9w0BAQEFAASCAgA8
-# lJ3093i4odqjyM5g/fMVEQDMdKZYBl9vSt17a7/Q1EbKKRKmFT90IluIz8q7pADJ
-# 7Y8QPDfdp6Ghrs/5z7tKE7S60bko8sgEJgWcMueZv/+5VFPms3L7BKyF4w7GcU+X
-# qH/9L0PZgdCiqHGNiKADlhcLgIbo28layMtLIOQzvKuyZPNa5kyN3f9Nf1QefTNi
-# UdhYItGTnkMCt87yOYdExWz8DLrECLN2B1rnmLIPBxaEbYaogtFGXtk2XFlMwphx
-# cLZj7EfcnDZhab++9fZ9VBOHHAyTzaQbGvdt3LGVOxM7+8Mu+fiZL9fpYTU5dqxq
-# dCf04H9OdrrUqFBJN2mewG/14NT68KvtV004QaU58rIv8+vydG5U5zvRUjIwqDIL
-# cul6ce+o5LPJ/pr10sJCuAs95U+XCJTDMJTEWbybjQwd7ISScjriDd1ft2I6sX4T
-# 6UMXG/CeYVrrHVDp+t+O2RnA8QOvLdkEoiTHPwEr+VSCouWZB9dSuUjmHQyPOwC6
-# odXpvmctc6Tifsq0lIX5l0g7Xt/F4lilYZymbiymKqvmtPJP7uDjtT7lTef79jka
-# uvOBEtWYzAWYzGyEu7i5gGtG7yXd1FWE0ojUMQybibDSe4J7B2ogDIbBqssxFMiz
-# KmHrKTmM0yKhkWfs6RPatDM2Q8dMgBjsvNS2AzWi2Q==
+# MDcyNDA0NTMxNVowPwYJKoZIhvcNAQkEMTIEMDADLnY7Qj+3ZP8uhMQ1oggMWrBB
+# 4FHpc5agYhjDPYWISa3MPYsC1W3NHkVAfDOd3TANBgkqhkiG9w0BAQEFAASCAgAc
+# g2/cP/FP/iO3OO92YBHVt1ANyDfPqRJBapsSAxAIeFuD7XlYwxqPiQPxlCfI1I/8
+# fpHnitUyKkr5ciFqZZKRiFJJ6Xkpp/wpzHU5lNAH50RPObsqMab4pf8Nv7OKrvxI
+# X5HQkdmsQ0WofiRdR8ULOWy0hQl8lLM0SYq5gkGMTrQYC1ZHuVUceiVY9e8rO/q5
+# vbKDMeHqcwibZsqMuvFfr8Pu8YUDbKvFciu4Ns67yfDc50Y0BKvIvVgSSlph3ioC
+# Xg7ns1+Wct05QpvDp+g57B/yA/8iLBcPk9gYUD20z4f8u5DBMQwO11BQyrxZBV+S
+# 4Zzby3uQ481YNYi4EmySWK1cAHA99LmnxBgggEoBxlfOC17YMz/5SkLJrNzUq4uo
+# PexJHmdlf2j3oZh3C/ja+jMxdl6Z40f6lR9XRD1ZTr6Zc0iC1mIbjkG6YbZDHaPq
+# DbVGyxP9yM7DnN4O+D3cBXQUl1rReZ4v/l67ezjbONMbo/fFONE8rkhFF7iPXZMS
+# HXnzg1UJNgQsFPXgFqpABX10DeX57EKC3j30rVt8flF8sZTAQuK7LnHlmgWDq/k4
+# vhE72PMBGdLGm0PLUiNmv+5m4M15xoU1PcwHptcbcRGGhEfgjvSQu2ITxRm25LLG
+# I7/KZEIYTzV6ATu+55jkmS6kz5gBJ2E5AcsI6P0Lbw==
 # SIG # End signature block

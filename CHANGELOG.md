@@ -2,6 +2,22 @@
 
 All changes to the Microsoft-Analyzer-Suite will be documented in this file.  
 
+## [1.6.0] - 2025-07-24
+### Added
+- EntraSignInLogs-Analyzer: UniqueTokenIdentifier
+- EntraSignInLogs-Analyzer: IncomingTokenType
+- EntraSignInLogs-Analyzer: SignInTokenProtectionStatus
+- EntraSignInLogs-Analyzer: SignInTokenProtectionStatus (Stats)
+- EntraSignInLogs-Analyzer: Suspicious Sign-Ins via Visual Studio Code
+- EntraSignInLogs-Analyzer: Suspicious ADRS Token Request(s) by Microsoft Authentication Broker
+- EntraAuditLogs-Analyzer: Suspicious Cloud Device Registration
+- UAL-Analyzer: ActorInfoString
+- UAL-Analyzer: ActorInfoString (Stats)
+- Config.ps1 &#8594; Config.json
+
+### Fixed
+- Minor fixes and improvements
+
 ## [1.5.1] - 2025-06-03
 ### Added
 - RiskyDetections-Analyzer: ASN-Blacklist.csv

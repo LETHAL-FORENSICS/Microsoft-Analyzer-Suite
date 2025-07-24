@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -82,6 +82,18 @@ Param(
 #region Declarations
 
 # Declarations
+
+# Script Root
+if ($PSVersionTable.PSVersion.Major -gt 2)
+{
+    # PowerShell 3+
+    $SCRIPT_DIR = $PSScriptRoot
+}
+else
+{
+    # PowerShell 2
+    $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Definition
+}
 
 # Output Directory
 if (!($OutputDir))
@@ -211,8 +223,8 @@ Write-Output "(c) 2025 Martin Willing at Lethal-Forensics (https://lethal-forens
 Write-Output ""
 
 # Analysis date (ISO 8601)
-$AnalysisDate = [datetime]::Now.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
-Write-Output "Analysis date: $AnalysisDate UTC"
+$AnalysisDateTime = [datetime]::Now.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+Write-Output "Analysis date: $AnalysisDateTime UTC"
 Write-Output ""
 
 #endregion Header
@@ -260,6 +272,8 @@ Write-Output "[Info]  Processing Device Information ..."
 
 # XLSX
 $Devices = Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Sort-Object { $_.CreatedDateTime -as [datetime] } -Descending
+[datetime]$LastSignInDateTime = ($Devices | Select-Object LastSignInDateTime | Sort-Object { $_.LastSignInDateTime -as [datetime] } -Descending | Select-Object -First 1).LastSignInDateTime
+$LastDay = ($LastSignInDateTime).AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ")
 $Devices | Export-Excel -Path "$OUTPUT_FOLDER\Devices.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Devices" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
@@ -267,6 +281,9 @@ $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
 Set-Format -Address $WorkSheet.Cells["A1:X1"] -BackgroundColor $BackgroundColor -FontColor White
 # HorizontalAlignment "Center" of columns A-X
 $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
+# ConditionalFormatting - CreatedDateTime
+$LastRow = $WorkSheet.Dimension.End.Row
+Add-ConditionalFormatting -Address $WorkSheet.Cells["A2:A$LastRow"] -WorkSheet $WorkSheet -RuleType GreaterThanOrEqual -ConditionValue "$LastDay" -BackgroundColor Yellow # New Registered Devices (Last 7 days)
 }
 
 # File Size (XLSX)
@@ -280,15 +297,79 @@ if (Test-Path "$OUTPUT_FOLDER\Devices.xlsx")
 $Total = ($Devices | Measure-Object).Count
 Write-Output "[Info]  Total Number of Devices: $Total"
 
+# LastWriteTime
+$LastWriteTime = (Get-Item -Path "$LogFile" | Select-Object -ExpandProperty LastWriteTimeUtc).ToString("yyyy-MM-dd HH:mm:ss")
+Write-Output "[Info]  LastWriteTime: $LastWriteTime UTC"
+
+# LastSignInDateTime
+# Note: Device Information may be processed days after acquisition date. LastSignInDateTime seems to be the most accurate datetime.
+[datetime]$LastSignInDateTime = ($Devices | Select-Object LastSignInDateTime | Sort-Object { $_.LastSignInDateTime -as [datetime] } -Descending | Select-Object -First 1).LastSignInDateTime
+$DateTime = $LastSignInDateTime.ToString("yyyy-MM-dd HH:mm:ss")
+Write-Output "[Info]  LastSignInDateTime: $DateTime UTC"
+
+# TimeSpan
+$TimeSpan = New-TimeSpan -Start $LastSignInDateTime -End $AnalysisDateTime
+$Days = $TimeSpan.Days
+
 # Active Devices (Last 30 days)
-$LastDay = (Get-Date).AddDays(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
-$ActiveDevices = ($Devices | Where-Object {$_.LastSignInDateTime -ge $LastDay} | Measure-Object).Count
-Write-Output "[Info]  Active Devices (Last 30 Days): $ActiveDevices"
+if ($Days -ge "2")
+{
+    $LastDay = ($LastSignInDateTime).AddDays(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $ActiveDevices = ($Devices | Where-Object { $_.LastSignInDateTime -ge $LastDay } | Measure-Object).Count
+    Write-Output "[Info]  Active Devices (Last 30 Days): $ActiveDevices"
+}
+else
+{
+    $LastDay = (Get-Date).ToUniversalTime().AddDays(-30).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $ActiveDevices = ($Devices | Where-Object { $_.LastSignInDateTime -ge $LastDay } | Measure-Object).Count
+    Write-Output "[Info]  Active Devices (Last 30 Days): $ActiveDevices"
+}
 
 # Inactive Devices (Last 90 days)
-$LastDay = (Get-Date).AddDays(-90).ToString("yyyy-MM-ddTHH:mm:ssZ")
-$InactiveDevices = ($Devices | Where-Object {$_.LastSignInDateTime -lt $LastDay} | Measure-Object).Count
-Write-Output "[Info]  Inactive Devices (Last 90 Days): $InactiveDevices"
+if ($Days -ge "2")
+{
+    $LastDay = ($LastSignInDateTime).AddDays(-90).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $InactiveDevices = ($Devices | Where-Object { $_.LastSignInDateTime -lt $LastDay } | Measure-Object).Count
+    Write-Output "[Info]  Inactive Devices (Last 90 Days): $InactiveDevices"
+}
+else
+{
+    $LastDay = (Get-Date).ToUniversalTime().AddDays(-90).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $InactiveDevices = ($Devices | Where-Object { $_.LastSignInDateTime -lt $LastDay } | Measure-Object).Count
+    Write-Output "[Info]  Inactive Devices (Last 90 Days): $InactiveDevices"
+}
+
+# New Registered Devices (Last 7 days)
+if ($Days -ge "2")
+{
+    $LastDay = ($LastSignInDateTime).AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $NewDevices = $Devices | Where-Object { $_.CreatedDateTime -ge $LastDay } 
+    $Count = ($NewDevices| Measure-Object).Count
+    if ($Count -ge "1")
+    {
+        Write-Host "[Info]  New Registered Devices (Last 7 Days): $Count" -ForegroundColor Yellow
+    }
+    else
+    {
+        Write-Host "[Info]  New Registered Devices (Last 7 Days): 0"
+    }
+}
+else
+{
+    $LastDay = ($LastSignInDateTime).AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ")
+    $NewDevices = $Devices | Where-Object { $_.CreatedDateTime -ge $LastDay } 
+    $Count = ($NewDevices| Measure-Object).Count
+    if ($Count -ge "1")
+    {
+        Write-Host "[Info]  New Registered Devices (Last 7 Days): $Count" -ForegroundColor Yellow
+    }
+    else
+    {
+        Write-Host "[Info]  New Registered Devices (Last 7 Days): 0"
+    }
+}
+
+#############################################################################################################################################################################################
 
 # Stats
 New-Item "$OUTPUT_FOLDER\Stats" -ItemType Directory -Force | Out-Null
@@ -474,8 +555,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU+xD0h0anep+se82B8L8R7Dls
-# K0OggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUU0eX2egUetdTV7O97kBteB+x
+# iPaggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -677,33 +758,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBTCTnelRS4njlN0gWeVjT/e5BG/9jANBgkqhkiG9w0B
-# AQEFAASCAgAcm5rQrWtAIPof2DDZJuZKZgcjty0iJlP6obGR2vRw9ugo+pwLYmEq
-# gcjujLe5c/Xoo5mI0OBleMIE80o4sVzl/m4zgO7rgUwF3BDwsTAkBTK31F5YtWAH
-# BCwUHmS06RMfTmr1ZrlM5lMbrPH0mS/6SqK3HZXfz2T13tEN5aKhXeNU4NAw2pLl
-# n0TeozQCojH9vWOePE8lrsT/GUu80gFSs64lXHbyJWpLPbLKQqqCjtVapHJ/XpJs
-# Tx76X7zv2OVKKGftM/RDpe9lXcjDGEQ84FkcqxAxfGr6eZELzy/+EsflWKlo5q4N
-# fowVj8kaH3f0Wke9d7ZrRgF38VE9MHh/0EYfKZ9kjGMfq8dxK3j7stmkFNksUSNk
-# Rq0w/BDp/lVGHYiQdfohj6yE2NPfeS4P0c3rMbOZbeG5Ukav+JEsfZXpF3smkku0
-# gJ3LdabTnKkcO+/03pCZCzIm0xY/QqdisR8dR9j5RCK09A+Q1OXdr6Wu9kG+OK+g
-# nWlIZa3bpH6yP3imx0Db5VkrEQnkYoJ1omMVM5Ryn4Wp1GqiK7XRK4Pot/GJYFgd
-# Jh+kbZPJ6enWDw0qixIklX5FY0eNcFOJGN1y/zOVS8ZKUqudj2Rn0kYhcnEUSSMR
-# 9CRMpTxClw/yF2cjquLdhh3PRAaChNJGsAp/jFlOCKMUF28+s/jaQ6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTwvJE96mYSEcUNHHwfQSqFqHyy2jANBgkqhkiG9w0B
+# AQEFAASCAgA7Oo7AhLoircmkkjNsBOsdIA9r1ulxVq+CclOXNvQx4kZaMgHlrxz4
+# 4M6VedWQsAsBgagC1CY8+BBjzIsJ5AG2CskFH10R6nhE9rFSxafgNOio/7utb8eq
+# nwOwgzsNcx1j62tVbWUAZ+IattIpksi8ANRvfq2Smvou2c2FLnlu/g9hiilhgR/Y
+# UvnBLe/SBSRGVqUlMDZSgdK8Eae2cfj9FXtoj4SOnunoeCCd+f7kcXoZYzOsJdjh
+# Kg5/1x1xgjrtfJJ9SsLg6J/yK3YPq8YHVCBNoPsK4sItmHqd/o7hghlat3GclMCD
+# UWntnAV2rFnXxoFxaBiUcZD86f8rdiiypNRgW8jdNfG5CL62TENxW07FxLt0yYMQ
+# VZvOi1KxF8hOZF2U+uEyNUIbwS99pTR84f7+m0m3Oxh1cY1yZYW/z78A8/jDsoAL
+# IYspTNinZBMTWz9PoGtRZYlo5Ash6zRLB6GM1zoFnWgop8QaXQeNN/MHsQwktgn8
+# gzm5S7s51Zl0hAd7sYqnZ2DFaI34J9S5icHQ+NfW1gcsmS64Kmj7R/2Csa2bPMjO
+# s9IVxpJpMQGSeltuoNJ/HxBkxx8jYCNi4g2HCi9hiqFS2WPOXxZTzA2sKnlbLiF4
+# E8nVvTrdPff+4rn/C/JXKAiyLefBfOqTbehq3S+T7MvQeh/ixsXCL6GCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDUzMlowPwYJKoZIhvcNAQkEMTIEMCJkIoStGzdDcm3AisfCqKlHJ7Q4
-# 9yCUKh3Mj53lzlbWL5oOF2lRW3AAMwStA4CoyzANBgkqhkiG9w0BAQEFAASCAgBh
-# r46NA9MXjwrMuGjyMmja2aUZGUJDeb9r7VM3aMymz28qNOzS8jGJ6EcHO4PzRRRo
-# VzF0EmYyvNLlxrzZM1VERhhh/mDyipqO5QZOdj4VuAZwVH4xOCY5DBRSIhj9SnRm
-# +719Ml8M+7HIMgoI4uJw2/5b5OcHVBmv5f2SoC3w0hLstQpgUUuYveswyWz2IzQ0
-# U35qrW/QZ+EHVVc43v0CVKaEBSO2XXq5xozH4xME0Zrii49VwTlvvGvXcSjtf4bD
-# tziIkgfDuCP3p+MYXxaNt5Fl3grhoxshZ4HQlJlvkmGQxog6br9xVr+6fxTT8EXU
-# 5bhscEDn5CwTHe5ssXb7woKfioW4UQK1DevRC68arnNlwVQlTurFDWkQQmTYvpbW
-# 8FbVxE+7MW2QSuqmmJD8ofrKlsbda0n0y5udTf1+xHwxRZPtdyLTEPyZofKbbggA
-# A0Zrrjy0IySdJzWM1JkJZA76F1UCxJxKxGAdK9xDh9V1c1sqEI3EeSoiPOdrRuDg
-# fM9pXVKfq20YpkyOJisWuhnWjTHi07zEhuX2gX700rTDELthIagRIUewj1oIyr8i
-# zH/Yv/RowsPTsMat2y+48/2s/JWuigOTYp9vvXU+ukq5nMaP5lOthWYKe34gMBpB
-# kMxmKr29HeLm/tHQAUZ3wsdH9yOQavicEjrJL1Bssg==
+# MDcyNDA0NTI0N1owPwYJKoZIhvcNAQkEMTIEMMRaHN1y+Olijo+Hejyq5svDqso/
+# jmvy1meixidaGHOyQmubPYa4tTkjjGJRIUc1gjANBgkqhkiG9w0BAQEFAASCAgAr
+# qSvuu9cybN6W3GPBqsEzZDm6pqyJUsYPBpbgdttXcwGULj07K3f9tdKbD9I76bvp
+# MmgGfNMBNc4MUd8QOYH8Xz2I9j3AeMvM2Gq/VyKK1KGhSHwdZ0T+Vcjmwq6NPgZ3
+# 5ZL5UPbd1E1WoFMHJ1NqRNow48wZOhHDDn6cTY7edm15E8NnonCY+mqaSadAnl1e
+# iE3RbP+gtB5uEkj3hbcFItwu/WdCcvYTeNuBhZMI11MDuyB56LBu0SQgjo6gAt9f
+# RG5pPQvfT1sUe5GeIm7dQjs/91H3Ggl2sZytv8lH40Ct4TDM8Q64X4ZUuRZChXYc
+# HJxyUkTs3syxeoi+UmZViwxLv+JJYeHpdkVjxq8igfjTL7DeCEK8Ib+LdDap/t/o
+# P3f4r00sjdqrtt83IhoL1IoqfitK1fnI2Ow/IvXvtCD05t5a8eY4Y0OuxxJC4wAF
+# QyHwT3wlvouPdbxV4cG0Z6o6v+7rzpjv/ul3OeNcZfru3r0bBF+87+2yRWb+OwFl
+# 7HeB9Xs0/5bbbvLOO8Jm656W/Z7ZnxEnMfuJujucMRQrW3JReEbem8x2LWVIJHGO
+# lsfvaSYlIGnFw20ua1tOGytr6Wx69gNWE2OQSCiYCbhiC9CEZG2hwecCnmfqrPeP
+# F3Vc+U3SJdWOD6Y53e+2CM1eKrS5uMfBmjJ9YVvctg==
 # SIG # End signature block

@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-06-03
+# @date:      2025-07-24
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 5.1 (5.1.19041.5848)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.5854) and PowerShell 7.5.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
 #
 #
 #############################################################################################################################################################################################
@@ -267,33 +267,12 @@ Write-Output "[Info]  Total Lines: $Rows"
 Write-Output "[Info]  Processing Transport Rules ..."
 New-Item "$OUTPUT_FOLDER\TransportRules\XLSX" -ItemType Directory -Force | Out-Null
 
-# Check Timestamp Format
-$Timestamp = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object WhenChanged -First 1).WhenChanged
-
-# de-DE
-if ($Timestamp -match "\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}:\d{2}")
-{
-    $script:TimestampFormat = "dd.MM.yyyy HH:mm:ss"
-}
-
-# en-US
-if ($Timestamp -match "\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}:\d{2} (AM|PM)")
-{
-    $script:TimestampFormat = "M/d/yyyy h:mm:ss tt"
-}
-
-# en-GB
-if ($Timestamp -match "\d{2}/\d{2}/\d{4} \d{2}:\d{2}:\d{2}")
-{
-    $script:TimestampFormat = "MM/dd/yyyy HH:mm:ss"
-}
-
 # XLSX
 if (Test-Path "$LogFile")
 {
-    if(Test-Csv -Path "$LogFile" -MaxLines 2)
+    if ((Get-Item "$LogFile").Length -gt 72)
     {
-        $IMPORT = Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Select-Object Name,@{Name="Rule";Expression={$_.Description}},CreatedBy,@{Name="WhenChanged";Expression={([DateTime]::ParseExact($_.WhenChanged, "$TimestampFormat", [cultureinfo]::InvariantCulture).ToString("yyyy-MM-dd HH:mm:ss"))}},State | Sort-Object { $_.WhenChanged -as [datetime] } -Descending
+        $IMPORT = Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Select-Object Name,@{Name="Rule";Expression={$_.Description}},CreatedBy,@{Name="WhenChanged";Expression={(Get-Date $_.WhenChanged).ToString("yyyy-MM-dd HH:mm:ss")}},State | Sort-Object { $_.WhenChanged -as [datetime] } -Descending
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\TransportRules\XLSX\TransportRules.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Transport Rules" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
@@ -304,6 +283,9 @@ if (Test-Path "$LogFile")
         }
     }
 }
+
+# Note: 
+# Get-TransportRule: Timestamps are NOT in UTC. --> Timezone of the investigator's machine is used!
 
 # File Size (XLSX)
 if (Test-Path "$OUTPUT_FOLDER\TransportRules\XLSX\TransportRules.xlsx")
@@ -392,7 +374,7 @@ Write-Output "$ElapsedTime"
 # Stop logging
 Write-Host ""
 Stop-Transcript
-Start-Sleep 2
+Start-Sleep 0.5
 
 # Reset Windows Title
 $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -405,8 +387,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUlfC6xIhSNLU9D5c3OwiDi8mX
-# Y7mggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUGscKO/5bLADyg6/2kF8R+mwO
+# wm6ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -608,33 +590,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBSO6DlYhSfBXLquUGSp8lMtZ3trsjANBgkqhkiG9w0B
-# AQEFAASCAgB4MqWZEexHNXiMP5s8NpGEzt7QLN0xuWRjlhEM4GOI4e5iu+bDxBS1
-# tkgGEGl0auuN/PW5coDrwoX1EH7/UielA1w0R+XOAxdsWhe3GJrYemPFdFa+HqBq
-# WMTe7jQw17z3IrGzG3sYEsV0InqDpdIVgWA6692ApBgyfMN8kPEKXUK/roIKH86T
-# b+JRf0Drf/qAcVhn7W9xvlWLctvnXacKv6HiX6qr5bBGwePDO8Vagyn1A+VVCYUE
-# l90pTVXBzN3ZqW9cZASexp/7y7AdTnHdpwsJudnvA662xwMA7PEnt7WDr2XGfrJA
-# P1l228i2GXgVTi20IGk4U5JgBqkx17wSBCTQB5T0W+RmxmVxJqhP0PI5QMu0f/jJ
-# JclmS4474vjREcwqM4F1JhwWznucNzjRAl5fDcHS/XxAfdEhB0CFUz+NNU6LoWDi
-# If8xNqvi1O5t6O8IUJws2oeIAHTXkXSyfXqu3OJ3sDhPhvOaJdzVPEzHiScTCnb0
-# FOemIjIl65OsMJhuB5+6s51ag6Xml529iC3B+CFGHw5e2HWgz9arnsi84YS0DcKC
-# 2uRI6pvZ34PEgM2mHouptbpzF0ukq52E8Lf0avCAwxXjjmviLugTnYJaCwH5j6D9
-# vFD2zAsmZstzRxQ54YNPKSi2g62XflZ1KF39gCZcoeTeu5ec7nVAzKGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBStGAHAi0vF1KGTu2e7oScbZvm1yDANBgkqhkiG9w0B
+# AQEFAASCAgAcprCnYX6pX4bLN1QikFu+n+QT9A9bskzarsxJ7RKeiOMQCrp0lnYv
+# iaavV30UEjezxjB5D2PBEAspmc+LgV78mX+I39QWTHxz8zfkFnhTPhHKQPG3Pr0b
+# 00n7I6Knc0CQaWxODWpMs4x/xXZTuvbpFHeFEf661IoGbH4yUME4OJFPeik//M+x
+# yDL77kujfiIPwEbVHFBQObQVWjg3159jQRyrjZ+v/wvHhC+hCT2ju28JzWEfaTub
+# KoYRNHpqetMgad/R9HpoqhuUVZzLpai5xJGKe4CgFl7X9U3S+jbcMLz0PXu4jSU4
+# knLwuODP7o6Y6ePBb1FtldFsA4LKgZuNa5RBT/K8HBilyoKAX0gxF4+Hx0f5yR+X
+# TiK63Q6miZ62sJDDMyE8VyuETye15o72y0M0FEvSR6VdsYpN8Id2soSoK1Dw7fAO
+# pgF++9oMuK6j7QXxMnzSl+ADMXxmMnF36qPXfWsPiZscABmN9tafEbWpSLG2QaLt
+# 3LFgszbz/Z/OxcTvsYchDO4ZvN90XQkYh09pWxnkMj8FXgL7twlOEocx8L0NpcE3
+# x8Ke3U1PHm9Ri5iomRBLcuRlMLznEVpJngxknGj3H6Tzj/qR6xDODMgZgCQhGNR4
+# sYwxmoYQC3NxXmbc44Xz0IhgtQ1DRx4aWjhnxcbtdc3O/zmaRJgJPaGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDYwMzA3NDYwNVowPwYJKoZIhvcNAQkEMTIEMM2xgmd/FfrOZi9MSHyVozLOiLCK
-# hvKItUOX/SVIiwUVm/8XHID191dD/pYnyWP0LjANBgkqhkiG9w0BAQEFAASCAgAg
-# J1MLFr/fNqSloKelLZNo5zsNVLg1eq3YJ//YO9ExZH+i1a13gi4Yadc8LeWmrtj0
-# miOKNC3IYP0jaPYZFzvBhOzgzt3VQNTr4cHXeVBVpxorFK55MZT6TWTjmn0vqbTh
-# KAETi/+txCgkkT4+tMyaaLFFsoaUQWPyjldtWcoc6dpCCTvYBbm7Bc5CQnsI9oxF
-# aEx+LMyyAlVSYtBLXiXd9WiBag8Qt+btqCnyN3zb9RPDoSuRMlBf5h7vCY/fthq/
-# sPEo6dxzMYHJ+BvK1R37nu270z9Z7Cgs25FV/DRqIL9tc3Onj/40KFfE8BLIGhaR
-# CCDSdkRgN6UyFm/HdASMcjBtGxBwIUW+tCFy14weYejq/eQoimENSsj1HoVGlABW
-# 6ZKj/djaNkHcBWBG/CvBPRhF9jJnRTnHis5PSkTAKt5p9AW1dZVjGUZz6NJgh6KE
-# b6ggKzqplUIxqumqdkD14u67L/vIpeZjNQLswwSbuCDNwfditDJEdIaK66fFsS6s
-# GfRu7n5Wsexuws8RRf1cLmZBc3BZzYKDOx0AE3mFQjg1btdtX/deTKgw68goNUMm
-# xpz4bUbzy7gUfPoWyKq2sLE4r9S/hRP3H9/aqRosJtV3naRZH+af25SJHtPzGaAD
-# yGiqV/P/Cmhb+/P9sTxJptXf6SIWdRNw2WDY3J2JDA==
+# MDcyNDA0NTMyMVowPwYJKoZIhvcNAQkEMTIEMDdN+BnfAJm4gdny+11bK9NEE1Fs
+# AXfg5dI0/gPa5BLte31NJj46rRldMaAeDkUOWjANBgkqhkiG9w0BAQEFAASCAgAU
+# wH/0CPqUmHokGtrNlXX2oCRObEUKhQCVrzSFnZHojIaQegCU3IpPpCgBKQHJIyGZ
+# RiBQGvGJifP5986HYtT9H/oib3rWPJCs1wQpNiK5IW7JLKqW/+/LwL0QGlV6Ij+C
+# NtrIRsh2JwfEiOM03FbDNP7jwiCK/gBvw+63qHXYd19ESHLpQ3p0BBvyn1IaPEBr
+# NoAvcywl1NwPUWrCDjBUoEslDSgy7V7W59b2uZN00+48Nr5BT1Z5Zq9SJcq/zoFI
+# QtXBXOcDJCgYDxzBT2xw0Tbzds9JcwkVkFuzcaFu3vKfiKz3kIVZjV2Ozci8gwCN
+# rFv5SuepIPznKkMuo/xCkVszGq3cjlBZp6/+6TsJVP0wem4Dtxblrl3hpvO6Wt22
+# ++SiJkJdRMHkTkdtLIElR5v+tXnRVm4Fsfx6TBO92/OX8tHI2yrUXuvuUQjtCeaK
+# U9GxudxJ/9jPe+iu0XhS4eRxmUYkzO8yLfA80rDTxTPwMS+ReMx3hU/alrv6HDkR
+# cnuR2dK4YbczlawtcUHxJVMYNLIQghNeA1F8Nrl4zT7YvWUNwpyJHllD10U4dX2c
+# U8MujdaFi3/pOg38js/hljmOj5z+Vxp6+RTwPAeJzLldUbjE76cj3WnCCMS1+HVv
+# fQZcLiwfyUqzqexUlUfGuQkRmwws+qVKIBDeBrNwfg==
 # SIG # End signature block

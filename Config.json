@@ -1,0 +1,10 @@
+{
+    "IPinfo": [
+        {
+            "Name": "IPinfo CLI - Access Token",
+            "URL": "https://ipinfo.io/signup?ref=cli --> Sign up for free",
+            "Note": "Please insert your Access Token here (Default: access_token)",
+            "AccessToken": "access_token"
+        }
+    ]
+}
