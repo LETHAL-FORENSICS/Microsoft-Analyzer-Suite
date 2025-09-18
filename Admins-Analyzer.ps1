@@ -1,4 +1,4 @@
-﻿# TransportRules-Analyzer
+﻿# Admins-Analyzer
 #
 # @author:    Martin Willing
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
@@ -30,31 +30,31 @@
 
 <#
 .SYNOPSIS
-  TransportRules-Analyzer - Automated Processing of M365 Transport Rules for DFIR
+  Admins-Analyzer - Automated Processing of Microsoft Entra Directory Roles for DFIR
 
 .DESCRIPTION
-  TransportRules-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of Transport Rules (Exchange Online) extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
+  Admins-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of the Admin Directory Roles extracted via "Microsoft-Extractor-Suite" by Invictus Incident Response.
 
   https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
 
-  https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/M365/TransportRules.html
+  https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieve-all-administrator-directory-roles
 
 .PARAMETER OutputDir
-  Specifies the output directory. Default is "$env:USERPROFILE\Desktop\TransportRules-Analyzer".
+  Specifies the output directory. Default is "$env:USERPROFILE\Desktop\Admins-Analyzer".
 
-  Note: The subdirectory 'TransportRules-Analyzer' is automatically created.
+  Note: The subdirectory 'Admins-Analyzer' is automatically created.
 
 .PARAMETER Path
-  Specifies the path to the CSV-based input file (*-TransportRules.csv).
+  Specifies the path to the CSV-based input file (*-All-Administrators.csv).
 
 .EXAMPLE
-  PS> .\TransportRules-Analyzer.ps1
+  PS> .\Admins-Analyzer.ps1
 
 .EXAMPLE
-  PS> .\TransportRules-Analyzer.ps1 -Path "$env:USERPROFILE\Desktop\TransportRules.csv"
+  PS> .\Admins-Analyzer.ps1 -Path "$env:USERPROFILE\Desktop\*-All-Administrators.csv"
 
 .EXAMPLE
-  PS> .\TransportRules-Analyzer.ps1 -Path "H:\Microsoft-Extractor-Suite\TransportRules.csv" -OutputDir "H:\Microsoft-Analyzer-Suite"
+  PS> .\Admins-Analyzer.ps1 -Path "H:\Microsoft-Extractor-Suite\*-All-Administrators.csv" -OutputDir "H:\Microsoft-Analyzer-Suite"
 
 .NOTES
   Author - Martin Willing
@@ -98,7 +98,7 @@ else
 # Output Directory
 if (!($OutputDir))
 {
-    $script:OUTPUT_FOLDER = "$env:USERPROFILE\Desktop\TransportRules-Analyzer" # Default
+    $script:OUTPUT_FOLDER = "$env:USERPROFILE\Desktop\Admins-Analyzer" # Default
 }
 else
 {
@@ -109,12 +109,18 @@ else
     }
     else
     {
-        $script:OUTPUT_FOLDER = "$OutputDir\TransportRules-Analyzer" # Custom
+        $script:OUTPUT_FOLDER = "$OutputDir\Admins-Analyzer" # Custom
     }
 }
 
+# Colors
+Add-Type -AssemblyName System.Drawing
+$script:Green  = [System.Drawing.Color]::FromArgb(0,176,80) # Green
+$script:Orange = [System.Drawing.Color]::FromArgb(255,192,0) # Orange
+
 #endregion Declarations
 
+#############################################################################################################################################################################################
 #############################################################################################################################################################################################
 
 #region Header
@@ -136,7 +142,7 @@ if (!(Get-Module -ListAvailable -Name ImportExcel))
 
 # Windows Title
 $DefaultWindowsTitle = $Host.UI.RawUI.WindowTitle
-$Host.UI.RawUI.WindowTitle = "TransportRules-Analyzer - Automated Processing of M365 Transport Rules for DFIR"
+$Host.UI.RawUI.WindowTitle = "Admins-Analyzer - Automated Processing of Microsoft Entra Directory Roles for DFIR"
 
 # Flush Output Directory
 if (Test-Path "$OUTPUT_FOLDER")
@@ -167,7 +173,7 @@ if(!($Path))
         [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
         $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
         $OpenFileDialog.InitialDirectory = $InitialDirectory
-        $OpenFileDialog.Filter = "Transport Rules|*-TransportRules.csv|All Files (*.*)|*.*"
+        $OpenFileDialog.Filter = "Administrators|*-All-Administrators.csv|All Files (*.*)|*.*"
         $OpenFileDialog.ShowDialog()
         $OpenFileDialog.Filename
         $OpenFileDialog.ShowHelp = $true
@@ -212,24 +218,28 @@ Write-Output "$Logo"
 Write-Output ""
 
 # Header
-Write-Output "TransportRules-Analyzer - Automated Processing of M365 Transport Rules for DFIR"
+Write-Output "Admins-Analyzer - Automated Processing of Microsoft Entra Directory Roles for DFIR"
 Write-Output "(c) 2025 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
 Write-Output ""
 
 # Analysis date (ISO 8601)
-$script:AnalysisDate = [datetime]::Now.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
+$AnalysisDate = [datetime]::Now.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
 Write-Output "Analysis date: $AnalysisDate UTC"
 Write-Output ""
 
 #endregion Header
 
 #############################################################################################################################################################################################
+#############################################################################################################################################################################################
 
 #region Analysis
 
-# Transport Rules
-
-Function Start-Processing {
+# Entra Directory Roles
+# https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.identity.directorymanagement/get-mgdirectoryrole?view=graph-powershell-1.0
+# https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.identity.directorymanagement/get-mgdirectoryrolemember?view=graph-powershell-1.0
+# https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.users/get-mguser?view=graph-powershell-1.0
+# https://learn.microsoft.com/en-us/graph/api/resources/user?view=graph-rest-1.0
+# https://learn.microsoft.com/en-us/graph/api/resources/signinactivity?view=graph-rest-1.0
 
 # Input-Check
 if (!(Test-Path "$LogFile"))
@@ -256,106 +266,118 @@ $InputSize = Get-FileSize((Get-Item "$LogFile").Length)
 Write-Output "[Info]  Total Input Size: $InputSize"
 
 # Count rows of CSV (w/ thousands separators)
-[int]$TotalLines = 0
-$Reader = New-Object IO.StreamReader "$LogFile"
-while($Reader.ReadLine() -ne $null){ $TotalLines++ }
-($Reader.Dispose())
-$Rows = '{0:N0}' -f $TotalLines | ForEach-Object {$_ -replace ' ','.'} # Replace Space with a dot (e.g. de-AT)
+$Count = 0
+switch -File "$LogFile" { default { ++$Count } }
+$Rows = '{0:N0}' -f $Count
 Write-Output "[Info]  Total Lines: $Rows"
 
-# Processing Transport Rules
-Write-Output "[Info]  Processing Transport Rules ..."
-New-Item "$OUTPUT_FOLDER\TransportRules\XLSX" -ItemType Directory -Force | Out-Null
+# Processing Microsoft Entra Directory Roles
+Write-Output "[Info]  Processing Microsoft Entra Directory Roles ..."
+
+# Import CSV
+$Data = Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Sort-Object UserName
+
+# CSV
+$Results = [Collections.Generic.List[PSObject]]::new()
+ForEach($Record in $Data)
+{
+    $Line = [PSCustomObject]@{
+    "UserName"                 = $Record.UserName # The user principal name (UPN) of the user. 
+    "DisplayName"              = $Record.DisplayName # The name displayed in the address book for the user. This value is usually the combination of the user's first name, middle initial, and family name.
+    "UserId"                   = $Record.UserId # The unique identifier for the user.
+    "Role"                     = $Record.Role # The display name for the directory role. 
+    "RoleCount"                = ($Data | Where-Object { $_.UserId -eq $Record.UserId } | Select-Object Role | Measure-Object).Count
+    "Department"               = $Record.Department # The name of the department in which the user works.
+    "JobTitle"                 = $Record.JobTitle # The user's job title.
+    "AccountEnabled"           = $Record.AccountEnabled # True if the account is enabled; otherwise, False.
+    "CreatedDateTime"          = (Get-Date $Record.CreatedDateTime).ToString("yyyy-MM-dd HH:mm:ss") # The date and time the user was created, in ISO 8601 format and UTC. 
+    "LastInteractiveSignIn"    = (Get-Date $Record.LastInteractiveSignIn).ToString("yyyy-MM-dd HH:mm:ss") # The last interactive sign-in date and time for a specific user. The timestamp type represents date and time information using ISO 8601 format and is always in UTC.
+    "LastNonInteractiveSignIn" = (Get-Date $Record.LastNonInteractiveSignIn).ToString("yyyy-MM-dd HH:mm:ss") # The last non-interactive sign-in date for a specific user (on behalf of a user). The timestamp type represents date and time information using ISO 8601 format and is always in UTC.
+    "DaysSinceLastSignIn"      = $Record.DaysSinceLastSignIn
+    }
+
+    $Results.Add($Line)
+}
+
+$Results | Export-Csv -Path "$OUTPUT_FOLDER\Administrators.csv" -NoTypeInformation -Encoding UTF8
 
 # XLSX
-if (Test-Path "$LogFile")
+if (Test-Path "$OUTPUT_FOLDER\Administrators.csv")
 {
-    if ((Get-Item "$LogFile").Length -gt 72)
+    if(Test-Csv -Path "$OUTPUT_FOLDER\Administrators.csv" -MaxLines 2)
     {
-        $IMPORT = Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Select-Object Name,@{Name="Rule";Expression={$_.Description}},CreatedBy,@{Name="WhenChanged";Expression={(Get-Date $_.WhenChanged).ToString("yyyy-MM-dd HH:mm:ss")}},State | Sort-Object { $_.WhenChanged -as [datetime] } -Descending
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\TransportRules\XLSX\TransportRules.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Transport Rules" -CellStyleSB {
+        $IMPORT = Import-Csv -Path "$OUTPUT_FOLDER\Administrators.csv" -Delimiter "," -Encoding UTF8
+        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Administrators.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Admin Roles" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
         $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:E1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-E
-        $WorkSheet.Cells["A:E"].Style.HorizontalAlignment="Center"
+        Set-Format -Address $WorkSheet.Cells["A1:L1"] -BackgroundColor $BackgroundColor -FontColor White
+        # HorizontalAlignment "Center" of columns A-L
+        $WorkSheet.Cells["A:L"].Style.HorizontalAlignment="Center"
+        # ConditionalFormatting - AccountEnabled
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("True",$H1)))' -BackgroundColor $Green
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("False",$H1)))' -BackgroundColor Red
         }
     }
 }
 
-# Note: 
-# Get-TransportRule: Timestamps are NOT in UTC. --> Timezone of the investigator's machine is used!
+# No sign-in data
 
 # File Size (XLSX)
-if (Test-Path "$OUTPUT_FOLDER\TransportRules\XLSX\TransportRules.xlsx")
+if (Test-Path "$OUTPUT_FOLDER\Administrators.xlsx")
 {
-    $Size = Get-FileSize((Get-Item "$OUTPUT_FOLDER\TransportRules\XLSX\TransportRules.xlsx").Length)
-    Write-Output "[Info]  File Size (XLSX) : $Size"
+    $Size = Get-FileSize((Get-Item "$OUTPUT_FOLDER\Administrators.xlsx").Length)
+    Write-Output "[Info]  File Size (XLSX): $Size"
 }
 
-# Count Transport Rules
-[int]$Count = (Import-Csv -Path "$LogFile" -Delimiter "," | Measure-Object).Count
-$TransportRules = '{0:N0}' -f $Count
-Write-Output "[Info]  $TransportRules Transport Rules found"
+# Count Users
+$Total = ($Data | Select-Object UserId -Unique | Measure-Object).Count
+$Users = '{0:N0}' -f $Total
+Write-Output "[Info]  $Users User Account(s) found"
 
-# Count Admins
-[int]$Count = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object CreatedBy -Unique | Measure-Object).Count
-$Admins = '{0:N0}' -f $Count
-Write-Output "[Info]  $Admins Creator(s) found ($TransportRules)"
+# Count enabled accounts
+$Count = ($Data | Select-Object UserId,AccountEnabled -Unique | Where-Object { $_.AccountEnabled -eq "True" } | Measure-Object).Count
+$AccountEnabled = '{0:N0}' -f $Count
+$PercentUse = "{0:p2}" -f ($Count / $Total)
+Write-Output "[Info]  $AccountEnabled out of $Users User Account(s) are enabled ($PercentUse)"
 
-# Stats
-New-Item "$OUTPUT_FOLDER\TransportRules\Stats\CSV" -ItemType Directory -Force | Out-Null
-New-Item "$OUTPUT_FOLDER\TransportRules\Stats\XLSX" -ItemType Directory -Force | Out-Null
+# Count disabled accounts
+$Count = ($Data | Select-Object UserId,AccountEnabled -Unique | Where-Object { $_.AccountEnabled -eq "False" } | Measure-Object).Count
+$AccountDisabled = '{0:N0}' -f $Count
+$PercentUse = "{0:p2}" -f ($Count / $Total)
+Write-Output "[Info]  $AccountDisabled out of $Users User Account(s) are disabled ($PercentUse)"
 
-# CreatedBy (Stats)
-$Total = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object CreatedBy | Measure-Object).Count
-Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Group-Object CreatedBy | Select-Object @{Name='CreatedBy'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\TransportRules\Stats\CSV\CreatedBy.csv" -NoTypeInformation -Encoding UTF8
+# Count Roles
+$Count = ($Data | Select-Object Role -Unique | Measure-Object).Count
+$Roles = '{0:N0}' -f $Count
+Write-Output "[Info]  $Roles Directory Roles found"
 
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\TransportRules\Stats\CSV\CreatedBy.csv")
-{
-    if(Test-Csv -Path "$OUTPUT_FOLDER\TransportRules\Stats\CSV\CreatedBy.csv" -MaxLines 2)
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\TransportRules\Stats\CSV\CreatedBy.csv" -Delimiter ","
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\TransportRules\Stats\XLSX\CreatedBy.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "CreatedBy" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        }
-    }
-}
+# Count users created within the last 7 days
+$Date = (Get-Date).AddDays(-7)
+$Count = ($Data | Where-Object -FilterScript {[DateTime]::Parse($_.CreatedDateTime) -gt $Date} | Measure-Object).Count
+$Users = '{0:N0}' -f $Count
+Write-Output "[Info]  $Users Users created within the last 7 days"
 
-# State (Stats)
-$Total = (Import-Csv -Path "$LogFile" -Delimiter "," | Select-Object State | Measure-Object).Count
-Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Group-Object State | Select-Object @{Name='State'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending | Export-Csv -Path "$OUTPUT_FOLDER\TransportRules\Stats\CSV\State.csv" -NoTypeInformation -Encoding UTF8
+# Count users created within the last 30 days
+$Date = (Get-Date).AddDays(-30)
+$Count = ($Data | Where-Object -FilterScript {[DateTime]::Parse($_.CreatedDateTime) -gt $Date} | Measure-Object).Count
+$Users = '{0:N0}' -f $Count
+Write-Output "[Info]  $Users Users created within the last 30 days"
 
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\TransportRules\Stats\CSV\State.csv")
-{
-    if(Test-Csv -Path "$OUTPUT_FOLDER\TransportRules\Stats\CSV\State.csv" -MaxLines 2)
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\TransportRules\Stats\CSV\State.csv" -Delimiter ","
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\TransportRules\Stats\XLSX\State.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "State" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
-        # HorizontalAlignment "Center" of columns A-C
-        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-        }
-    }
-}
+# Count users created within the last 90 days
+$Date = (Get-Date).AddDays(-90)
+$Count = ($Data | Where-Object -FilterScript {[DateTime]::Parse($_.CreatedDateTime) -gt $Date} | Measure-Object).Count
+$Users = '{0:N0}' -f $Count
+Write-Output "[Info]  $Users Users created within the last 90 days"
 
-}
-
-Start-Processing
+# Count Guest User Accounts (External Identities)
+$Count = ($Data | Where-Object { $_.UserPrincipalName -match "#EXT#@" } | Measure-Object).Count
+$Guests = '{0:N0}' -f $Count
+Write-Output "[Info]  $Guests Guest User Account(s) found ($Total)"
 
 #endregion Analysis
 
+#############################################################################################################################################################################################
 #############################################################################################################################################################################################
 
 #region Footer
@@ -387,8 +409,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUxIlasIOp9XJm/iBPrpY8Qc9C
-# 5z6ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUdVbPuGTI8rsFBgyjGpjSbY8n
+# mY2ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -590,33 +612,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBQ+KiqPp8Ou/egI/ZdyCl4Tn5BnVjANBgkqhkiG9w0B
-# AQEFAASCAgB6skozTdvNdFbURE7NCB3V7bImQp309kWeWhCwThKC5bHnJ0yOA1sr
-# YHMtJMHPiuN1Ifu3Q3MJOgBRUoaTcqeOkxVfbIlP9Ds59w/KVBm0x3vE+2BiAzM7
-# 3V5u7pHdwPWWzDIaoeHEEn0PRMmJcbEh58k4D8SAnJzoE2vx9Qvnu2uMS+qOUZHo
-# gzqdMNCUan7cCZockQK/Gi3hj3zGGvxg5wPwcGS/jPJSw1t6SG+ezpp35Drx6wel
-# yislxjEOm6QfQMmP86+srTaKPNwpqOgNUlZSvzfjwb9/s6VexVtCryWRdjL4jzoH
-# zXb9VmAosmve1sCdcLu4vg+DmNBEg/W1p3wPBwF5j1D2YnrF23tbavSV0ZqNgD6d
-# IJKe8+txdlDgg2EdVBRJkICWuCDbe6d6swwvQZWZ8T9rpAUV159X7bhZcrKPoypj
-# HhZM912Q8lefp8JJxNtIw3jaPpza+0ZZiYozPCyconJygY5p1g/p81vmqZ2bA2yT
-# pKsdKkdV7bo4WPd0qg9G1IbAvr2EU91mBLV190tKQOEpzPGqVvKneOSWlMxbElqm
-# cpTMtdYkA7Zi0QUesl6pIYJxCZ+QASzOB3QJaZG3USN7r1+38H0UQoY9CWtCVz3e
-# 8zXk74oLF25LlewPMCqG/ZT4uiV2Vu1n4X6q6Nji2giLHXliukoDZ6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTfDI64pCE2xVUHAtJZM7/0GgHgnzANBgkqhkiG9w0B
+# AQEFAASCAgCIXzPs3rGQ67kA94ZZgAyTqsF8UhicSeVSG/tLxFrVyquIDKXjoV/R
+# YIvi2QeQ2irIpwUaIQ775/yXPZpBKVpW9fubScr/Go+41aAU6hI548vnItF4Hg3T
+# 2I1HmaH8XToyjzWNXcMadS+CJnD/cQl3SZF5hDcBX4E2IPM/tlpESiPGhVhEVUbY
+# HFHleI0YmYiRzr7Zm5W78/aeiS1XzGkKESj5sRx9tKj+mgBS2ezGe5Dcfd3j/G+5
+# oST+vqFK8dAlKOc+Tm8ZrdLCwCp7Tb/B3xQW5HZX6N0UKy4t3azs9oqBkQPbXN2k
+# B+ewsMfCwjfP0HBxw5GPWfMl4oiKvD3ZMJtTOn4693zjvJrjg8UFZ9DgXGTOClyM
+# L8V0uYucyfdUN9FhZhNJJcYfO9kpBMy+DAr6RPAANeAytJ1PAYWPnRLfRrZ2EM6m
+# 0qf5VL5gJNaWbmJ8yeHlm/USzhkyD5Kd+mMjI7tNpPO2ezOT0PY5EZzkGlQvQuEM
+# Tq+ti8CdkwnTwRPhOpq5nKqMQ8lEfBfWK1+RbJYaRoIZbAYSEdqRYkYvRtnhuWnB
+# 0jy61aiXnvLuMGcZ3qQAxDQM1RbPIGiVev70IKTrKxuV57IHTB1ZwszJJ3QB/+9y
+# gDcxogV7QBmsaDZWz7YskOVF40NBf/rkiDuDTCRs3LHvt3k58QdA1qGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDkxODA1MTAwNFowPwYJKoZIhvcNAQkEMTIEMLRoVIFYYG4aHPDNtN/JszjYGHo8
-# OMvScPDH5/Jkh2SWNuigLRghmPq/jvMFep5ZnDANBgkqhkiG9w0BAQEFAASCAgBY
-# TWvrkb0VK4wQ0VO41I1J/kA5vEUkuAk4G5Pg/uWlp+zOYAH7AF837SyM2p90TP5n
-# ASPMFcm9mQVttuocV5LazD90vJrBv7JKNGF3/siYPTbZ76KAlIbgsb3lEYfosGl8
-# yGwO41d9daa+hY9EAXkOVlzWACWIAL6SVdcu5obPqI9FWGRvC0fixFvLK7bhSrIS
-# cEMgwigSXP9HYXnFVgiEEafkFLMYaya46DyYMXPWzojOgLQMYgPq4m5UfLfeuyUJ
-# eLab38arOuKcmi1kbHT1ismqkP3cTCwTgq91Tb2gt6xqca29Bt748MWTF0loZ5Pg
-# Zm7ejn53XuJxsbPYytFoNHo78FElw0MS6ibgFBAHBjBJYmfSImgJJCnLYCJOpE1K
-# xb6x4zOlGQSZcA/pQOQWTAH0Uugc+UfwO8l4xJC6JkPcFu6uBETzAmCTfdv2WleU
-# 51cBEt7XPHlIYlt7lF6RmvP3QETdTGWEoe37Oy0jefO+qgLHDS5xu9YGFVtV5ou7
-# 8iiYbYbX0aj4cpV0fZozog7VOGEiXn8IMsPAPBhkymMj5pMyoO0nxO4LYGWrfich
-# sjkUc1yUN7R7pti/yP9Z4yBgMPWRHERX1auW09e3AKD+B8kYjvWXLKR7iqWHfZ81
-# 4pkKxITmJP4tHOGdN9FEKNlQguuDopx0edISyBVqSw==
+# MDkxODA1MDkyOFowPwYJKoZIhvcNAQkEMTIEMMjs364BzAgkUEDWiJYhpqufxUEQ
+# LH/BQhf/L128E7mqMeGO9SkcJaO7dJNFpttSRDANBgkqhkiG9w0BAQEFAASCAgBW
+# E6qiQjGssKJZdRoDTUsKa5Z2/hGmoESZAagzk1FnXZV3GEjYmqEX05GR8YYEB5vi
+# oHbGI1nYiHSKncs89axiZ3ywKccNYY6JfAKf1J3yZ6EcPgoAIVPng2l6GBQcaOkx
+# l6wYlpU2o3s9oySp39ao4QAj+gl7TEEkTojUsKAYWMnuTO+mgKDuqLdDuiqVgSd5
+# H5v7FqQG8/Nui6ZExq7LgzOwuFklr/3pb5pgks/hrC7nobjBenLll7kn5hLKl+XG
+# M9IOfySZ2dJx7VRnKiulR3jJfUvBdNsiOxI6dOXV8S6QK//Xf/7Z5Ply59hYwqR2
+# ndrDRkNIBX/n0O4jR+AqETQV4jmSxKZyjUoG9ZOYDnR/lmWauYKVz7RsosU2ImJS
+# YU9OFFRej8M8hk2X+biVn/kWvJXajHtSgQg3flDGrTTJKoIbiA693RnLPtPUzJrF
+# 9/nWXnfZspq6VXYg+O4dxEdD35+AIKmidErol2Ki5rUAhpZLv8saltOVUc/+Ilta
+# 2c0P8wGtDHT+tedWzcjxwbmTkjAWyLC039zlOtZHgzqitc/U2FkieLT1yGatp4SV
+# iM46RPDKCl1iD7G3IV2B12izEQGgLPQGjdchLbk/4K1MWjU6iPbxqNBNyjYoOyW7
+# DOYBzGPKM/JeiWEC/RwnA2jcEonEZxjnBZH+BhERRQ==
 # SIG # End signature block

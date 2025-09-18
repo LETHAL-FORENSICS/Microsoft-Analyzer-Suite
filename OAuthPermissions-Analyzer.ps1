@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-07-24
+# @date:      2025-09-18
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -35,7 +35,7 @@
 .DESCRIPTION
   OAuthPermissions-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of M365 OAuth Permissions extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/OAuthPermissions.html#id2
 
@@ -1282,8 +1282,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUVSVPfbYUo2+p3+/DRBugfd6b
-# 4dWggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUVizQmFIM2At8qHVbc3F7FaDi
+# 8fWggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -1485,33 +1485,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBStKXU4DuCMJ5CGmKlBq2ugqwz4kTANBgkqhkiG9w0B
-# AQEFAASCAgCYy4GlEvHpkoNPF4o5KD3D9P9dPUeoMCoqbx4/qqr59/6d8k+IewcW
-# pbtuBbxOP8FIEG34PPBCZUo13/nWR46oDYD1GxR4grI7tvACNta/Dt10taepv6jF
-# CbJmQ19haT/fhmChWVMIRgVpTDiyLSMslWx+62w7moQb7gQOShZPcO5W4Njcj/rL
-# lpGNfmCmMl6c74Ye7cUabP4ALD0Q0lPXDNhG5mCKvN0RoDQ5cGrFbIlN2F4H6bvK
-# Yam25X+cAeTVnB45D6L6KNPljVRPGVv8nsVE37kXH8dFI+jBdjKauZpElo1p/08/
-# l//72gqn0C6wSf1lBcrFeXGK699OHexqxZ4D36jRhbM7APB474KpPetiy/y069Fk
-# FCy7dyrOVq4uxQgQcj/HjDJpPkK00IeoQZCtSMitxeBkPQL7TyQGPH+N5+laCuYX
-# oQuNKkBYjJDv1OLIuh05AocuXs/7UvebckdScVG0z+dNHeDs6DiIcL4CVP0ivNWz
-# ExgXoV8Iibp/1nwlafRT3uI9PTlwy7lKpBTgI8LAWRh+/9raFLucBoRtTVczLDMS
-# J/vlWLUFgatHJ1S8nW/tQ8b6ukkXm+7KHFjuH3S9UAWMtYX5HCUHxdh3RyK23/JS
-# 5C4SmFR7Q63l4+c361IVD9c+/mP2CW+Ut8uq1JJ3E7j6aPW6i5rEDKGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBT6O0zc0q6JCA2mxGwD0gMFvm/M3TANBgkqhkiG9w0B
+# AQEFAASCAgBfRAyjym3MGbTN9gyXtg4fSWiMLzTp6q6PuQUdoaN6PzzW0awG5JUp
+# umxD9XH8AjBgh5UoFwVs0DYyyY5AL4aUT01uQ8K4G3ym3rfQP+FlYKZaqlTtzR0/
+# VDOTCVegrc50LD7ZArqgIAEe5GGShYDqRkNk6sALUfDUTQHh163FVH/Cophxdmkj
+# nkaFqH26J7D7b4FYnkg8wM/4L27PXE7SGDyeZ1DP6vsjJsV1ctU987JopxRH4JjK
+# oPjl2pakzoFOebx1s2wSKG0xF7OE+/i4Xfb0nq1RbV57I/zlfNXUhKcgVAwMgLeB
+# CV8yST1bYyN/0RW7heyJtHmHX4agsoodx5/LsLY8AMjK8CKEslvMMvfOhuXctAk+
+# bYhCI0Y8InZGN7bGbmBcQB6YV1wjm/obxIJeJAepUER0b9kfXPjf3WhHymggSpzF
+# wX+BvB/Aq239iT2LJzDjuOLY5Y9bhT9RyxfVOm30dthIv5FXcfDtLsTky2FHDQZh
+# ARnrg+xH5K9SLGPfTJ+7Sx49K7IAIR2lIFUTr9rjdvl1CWI+Mez/5xnZiPga9czf
+# WcYq3ZaMJ68pgCB3FAA92sll1YF2ZRmvhiDCDg3B+nD5XGL26D7rxC6EfiP6fPYn
+# z2lUV6o4QtW40CMLI9nI9zltjsJC1fVb6PcBPyu3AGtKzWjdJ5odkqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDcyNDA0NTMxMVowPwYJKoZIhvcNAQkEMTIEMMy3DJLgYLqFKGl0uboGoYRkomXH
-# NO5+vKlc6i8XdHTRgmVvxwBP+gukVNrpcYYBBTANBgkqhkiG9w0BAQEFAASCAgCf
-# PpCCnT+KQBLnHFgIgbQy3NwkSv/Wy12GSJkg+Rq2zYc0Cra4nFhT3eVxS00k96Iv
-# RbTlX/PAAXtm2Lwae/GHh4ipJiPWXNmdTVWJWdomGI3EOJDfo9xAhxvfOXj3pr6s
-# 90Y4zhQ+V3GhvkQVnyEkJyec2gGJIb2TV+Gnu4erJdf9JvDJ+DFPfCxmWL1Hm/Fi
-# 3nJfawLCR23J59Hsd9CoBOlZZ6RoJTRxFOvGNmm0GDpM+kU/Rh8zSrn/XBILNr4N
-# xzUruKKH/esuXKKeGcB7Zr62xMLZBzMyxli6KtfAWda8hl3R34uKxvRSeWvueFD8
-# Ct1Lt0l/NVY10GiUNB68qcdOCej+zFj+XpLlExUZFUFHtTh8qakb5Iz4CRKV4JFL
-# yVtyxj9CaogCZqxQEv6gJfrfzpzRORNm634Mn2ZOoJtJqdC6VdDEO9NmBlBCa/IF
-# UF4nCnIcqjfUUK4pIppYIdj8rG15OOPCA5CbFluX9Woq0c3ye5vIcEJG4l7BQYJ0
-# usY2O1KIfh7Pnwy8jOObyBEIjYPVznpFdY9Q0nV/ThrxbL7eJgCOgko/lfy51R25
-# CfEmCXaEdZtKOsdZ8tRd0dCLtUh5v4v7ygriFaLIjIliePG3TMsYjNrGgGlcN/lX
-# rHJ8NqlnxjFm5p1ZukSHeMtuEMo0UVMV4JNsCZWvRw==
+# MDkxODA1MDk1NFowPwYJKoZIhvcNAQkEMTIEMGMyfL9WlBNlqfGm0I1s+2CS/SCR
+# C6Rv9Nymxgqt73r6Znu1XTRt+0nZ67jFlTeQ6TANBgkqhkiG9w0BAQEFAASCAgCz
+# JHtyW4aDTCR4A2BmqTwwcZr+u5ymORGYqltHsn+fkn0CHmmgLFCGZrdT3yV9usSy
+# 7+0cOaN+Uu438DpdEf93GPWY+GYsCXeI2mtg+4IxrVzQYHD8xOQlBYotd3ZSAr24
+# ZW2UQIm0uyl0uTlkmc3g+I+BCXJnC4qXGnltJgZxSZ+t4/LFpVaYlXxlJwFGpmNX
+# hizK+5LDqd9FgaFae91Aa3ZeZhhk71eMPoVexQpGbAKlzAk/ynChHuD461W1dLfL
+# rjHIVvHw0uGBu9enBXcmfH1JTzG0EY2I8dyz5SW2OpqJJZUAxaINyTv6FUAHnBWn
+# Xo9K3S0jsFemnHfGMrs0HEaEO9sOkbfeb5AZC5iTEe30zTSM6oI7kL7H2UmTSbYM
+# w5kVs+Ijd0JarvnsH2OCChcOkLUR73QJOe4C0EvuWCpdKwqjE96woK1DDtXtphIU
+# FeADLfe1410XlmS+ntxGpZrmuLWnbHF3tmrQJFWKi2x8I0NcakFJrO7Yeftft6S4
+# epoIb9wLVFF9OxXV2IRFu8fpt0PBTGquIOUHPB/Bd6Q2ouRKaAM3AzNO4GpTKjKT
+# Yl54ef4sZWKybDhCKuFkMhywfoZWDQDkggpSz7xuboK7JLGKl6ViuNPzE2PpJkyN
+# GIONAUtqIvzy7jH3xzxnVzTf0FplkRsm+kuDn6b4GQ==
 # SIG # End signature block

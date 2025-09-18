@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-07-24
+# @date:      2025-09-18
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -39,7 +39,7 @@
 .DESCRIPTION
   UAL-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of M365 Unified Audit Logs extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/M365/UnifiedAuditLog.html
 
@@ -9492,8 +9492,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUICRVopqKAFXs5nZeBPrMoJG3
-# hamggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUPKLic8xOi5T+UMwaG/TZPrm0
+# H1WggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -9695,33 +9695,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBSnyCMub+NZsTN9OWJ3CJQ9xmVUfzANBgkqhkiG9w0B
-# AQEFAASCAgBYbp3OMI99oB0DZuevo27EiKI3vap7x2Ganl5Dz7tW/bE+popM2X/x
-# UkQptBT2c5mKwjejdDDCc/bwWopmpHvnPVxKvtBLt0d8JmuZPJ4wMt895oKdS7Cl
-# KZrCx/BvxSLGlBRod3NLvEmaRzqKjFhepvX5ZwmqM2b6JaOpTuqS+QElGCHGx62w
-# Z8yCDD4ff5VvdJCmA21zWQR694r51CkXzIikMuHc5FCVh2980HgGFYT6ckgbBy9u
-# t6Y4dYAIFo6kS5YokQzYAHSFJVf8sXJ9Ln3Z/Py2VZlRkpMqbv9EO+drP25tq5/y
-# QZaKCxaPI2+b6xYEtk8jtAMW97fwfHe3NPijC4U7ZNSQtOMXyx6kTTCJLB0W96FD
-# jHOLh54Xp9/OcswTimicG+KlUWlLoLRGh5ZbrmMtsGS57jcjJ1/zCQrLj0z/XFGg
-# HOjuisboNC/FvPmnJyaaU9QU3i7BuRL5DEjG6ZQC0+fpi+cTiaOo4pBKZ2GV4rCM
-# 55BLKfkjRe5zDJdAqQJKfWWKpMeIua/oxFWU+KpPUzLSbBiTbD51NbY5J8wArdNV
-# ms7ws7NBybUVQiP2HbQMcTznxNBRSy/pqcTsQR0SSLl7pkgH+xFKem6WQ1ydf56C
-# AHyfujjznae4oSwJ1sFC27R4k9oMzOepYiqLC5LgfaxA73Z8uwv/LqGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBS/CJoqA+yrB/zhdYvPlRSG1Avc0DANBgkqhkiG9w0B
+# AQEFAASCAgAUzKh1OOF/f+86tkI7JssRaTo+nNn75JSmRNdyp8EhyEcGcN0vHJod
+# noAHL995siQgUqHxl9eFKX+7oBcygiWkb5afUX1NV4QuwX+8bVhFoQ97EsvnDKu8
+# GIhdHHBOvY5PGRFcdieJnR2+ab8QhusB6mh+UYk6YOXW5OCXehjW61HCZOUDuLT/
+# 90iEv+YLkIK/hMpQ+rupWn9ET2uGeE8zDMaj2azn1y1/Pz5jy48f1Y3PagFmcUTO
+# TlFTPE38/CELsS9kzJ2j7l08fcK/xOi8+XiqGc3uEjKUbWF83Jla047hbl5WD2jU
+# 65wKN0Uyfjuzf9nh1+gM83sFAkQvqF+qvbM1x333oT//4ggZr5imo0QWt77/I27G
+# yoP3pQyjzu9JPs8oggysya2pCKTaBAFu90+KhxODMWx6gDBHB2I1P9fL+0+wJaJ+
+# g62FifXCDem4b/ktsqfOT+mhNypnyvfprsSy4Uz9IVc+esaKn0cfo4ANCdjoPP6Y
+# O7s8B50dka1YuPxDGoPHvAHA9nv+8Wa+Aq7suDySnYeDZDaVbrbcNQ8DUsu3tf8E
+# 8vM57PA0DnaF/DP2GWCoF9gSddBh70JHTMvEw5ulQvctvwIigMa7zIeFFLH2Od+x
+# AXwwTkSa9gLCEXs6iZgbZz14EBPf4s3Ev8Fjp36qFMI4esJFu1DR46GCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDcyNDA0NTMyNVowPwYJKoZIhvcNAQkEMTIEMAqYbRtWoOmxT3GTyzQLv1Zc/jri
-# QuwNCKckdPSPD4KpZDjvAXlVZ/b7Kq4HQxToHzANBgkqhkiG9w0BAQEFAASCAgBi
-# NAXT+sHfNUEtuNyjFcDnQNUXsqGRMse4mFDHCRoqjJCbbJnWshA7i3Au5e9HPYDd
-# tp6xLeum0UkYOF87zE3QTiKxO0kB4b7DzQMCS4fSlfa61z6pFzEg26Nr3y/PNS1v
-# p4NE3FdYBB7n8nh90R+KS3YW1KimkKajx9Xh1ko/ifRjUib/C++AJagm3VH6rA28
-# p6T1D3xaTRXI/0Uuc/be8dRt+GaXB948Xid+FpjhmONXygKRDlgvyYyn8F0caT7+
-# UG8jFhWhvFlJmZvT4BlGHzANcLCSSleBz7Fc2p1Oayodkz07Qwl9I1u3QmwgOzct
-# fNZN/m3ziobdR4+AFd5KrVI/rHukszvgcS9rpDKgN1a8xiRIM6PTw45hC7hHZGnd
-# ZWZlzZKCJCdqnSOJE5I/cXaoXnRkxChvSfKfsGt+O7kNuO3lHBR+IZ4irC+SQal2
-# 4+lrlyCatxbz6GLzKfg1b41TiXiPLO7YUT0VkY4m+p+FdiMu7jItYSBHKoPFycqo
-# 6jXXBE9SqknpsG3WN6+1YA6CMZ+5JHPxeXh8n0AM9FoYvrzoC83Jxzs++mwNvPUt
-# nqdBJGEu16xusLc5ITUWoTrHismDqYI3zt9TU4Oo4mGvLRArdq86sf2KxnYbCV1F
-# Eus69g34QvyWWTQAYN5+L2iMiy2x4aBLd+I9MjcSdg==
+# MDkxODA1MTAwN1owPwYJKoZIhvcNAQkEMTIEMPOxoGOuxz5JNZVdjbc2E4pzmJ5G
+# iiuT0cezMo/N0Xx2QWjjSpP85VitqNBzANLh4TANBgkqhkiG9w0BAQEFAASCAgCD
+# ul6+6HAmRmNy026ZQallfmV85HSVb15RdrYyIvwWhPoW+jrtOkUayk71fDn82I/u
+# RFFV3m3B6olh/aA3QsVGF/6CRYS2lW7xEJlKkLNbLzRLG3ZxbYM2nyWmqBUpMRtD
+# jKk8K6msj25VdpsMdwHekID/CJsyJ9e6jY9BJdT+jBjwu2VKbuzmThj5tW13E5U4
+# dBqu8cCylpaj0iFMsFOyol7hViMOmxD94aLrLSr7XWqIVhena6jKNwlmnZP2Hp1z
+# kJ2u34Y/oo92qSiKQBOUAta6B8yOYijL14/qg5vZHYMAugVtpGHPmmbKnXqPsxJn
+# BG6L0AV4owWA356CJd7Cw86GwQYIu3bHYp6AlwAtqdFgsTeOLVUtTkth4aAitWZW
+# Qn1e1PoU90RtsltGYGImHVeTWLSO9GM5dRFSuc6MKLdCOFpgSCqVV6Tti0OxV7J6
+# nU+xzQXhhbar9yKujXA6wtgnchRJDh7lQVeKiy/swXmGweUTW9dgcgXU8qHLAKDe
+# oIYBTanmXxfCzpuYpurLQcQrA5IX4ERNT0uJV6pa16SJJTTXbqeF1FBHYR6RX05A
+# +bQYwis9ufpxq9c25+ZfEhTMtcijE3ULkFuMsHAjGte+kMjCHh76z9KWCzZhMySe
+# pFox4v7RWnxv6yaFkxJDbS+oFMyATZSrBZ2GVyzBEw==
 # SIG # End signature block

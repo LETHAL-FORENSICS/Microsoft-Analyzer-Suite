@@ -2,6 +2,13 @@
 
 All changes to the Microsoft-Analyzer-Suite will be documented in this file.  
 
+## [1.6.1] - 2025-09-18
+### Added
+- Admins-Analyzer
+
+### Fixed
+- Minor fixes and improvements
+
 ## [1.6.0] - 2025-07-24
 ### Added
 - EntraSignInLogs-Analyzer: UniqueTokenIdentifier

@@ -782,9 +782,12 @@ if ($PSVersionTable.PSVersion.Major -eq "7")
 # Get-InstalledPSResource Az -Scope CurrentUser
 # Find-PSResource -Name Az --> Check for the newest version in PSGallery
 # Find-Module -Name Az --> Check for the newest version in PSGallery
-# Update-PSResource Az -Repository 'PSGallery' -TrustRepository
+# Update-PSResource Az -Repository 'PSGallery' -TrustRepository --> Install newest version of AZ next to the old one :-(
+# Uninstall-PSResource -Name Az
+# Uninstall-PSResource -Name Az -Version 14.2.0
 
 # Set-PSResourceRepository -Name PSGallery -Trusted
+# Get-PSResourceRepository
 
 #############################################################################################################################################################################################
 

@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-07-24
+# @date:      2025-09-18
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -39,7 +39,7 @@
 .DESCRIPTION
   EntraSignInLogs-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of Microsoft Entra ID Sign-In Logs extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/AzureActiveDirectorysign-inlogs.html
 
@@ -3067,8 +3067,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUnYRV5nrkidhjqGzoxhFvGKZg
-# dquggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUeGQ+6kgnwq9D3EJMD57dtJE1
+# vo6ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -3270,33 +3270,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBQqZdiYiqsaOD5jUMU2UXuBHioK+TANBgkqhkiG9w0B
-# AQEFAASCAgCBbgd/ZhI7pgAoijwwT9/uGr4wOLu0rZURQ1gvC9PXV1KksEFeK7sC
-# rXDoefHs81dOuoPbIIk+UULbEkEEUTjnrX5M6KAy3/OxujkefzicFTiSpQNtgC6K
-# gScyO0901g81xFfivsdF6vkk7Yi1Er50z65/SHk4bMl2GHf5l6xa+T+9N3vwL/0l
-# WGikACgf8csysA30+Q7wB263GlzjCDkXKWk0mYo+MYmBUVZqUSamRUrshSlARkVw
-# vASG/ULm7q4oi58yHXyL1z+PnpLrTOJMTpyAuY/13BNayf4fZWoDmplBvymwEwoK
-# 0HBrC/25tmJRvdGIfMGncn9TJ4lEX7RXlCLAF42gPE6ceHQCtagFY3WLTxgovhOk
-# Tqu5ZvgMupbdoIXYSFnWB8qTcmKti0FjqkysRRSVJIvDa51K2r3HVG/eBjc5ON9F
-# CLznhoIx8c59yBEPf6mHT1lqK+ggUqDRDkre4JsIZybmC2Ok7w2NS1XpFudTLvOj
-# 4O4tuUhBC7CExM5hslGSfe9JsKqff1C4aI2R0T4BlAY8PF/BmaOYSBvtBE27ehdQ
-# reWGOErklGMlvGCjBMtzkue9aQjR7qNtgeVaOFKSSje2yKXov4Zxd3r3gV+Xfbwb
-# F93FtK0AwVa2gnFKSIt0acjjxzklgsAP4b7Rs4+HSzSorn4BNfjfYKGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBRT/4F7rkX+7QAPIitUP1rIgpLVZTANBgkqhkiG9w0B
+# AQEFAASCAgAzxA/3PKTlWBTauZuCQhBb5u28G8YQ/XfBGUn1nM/MuPRSUaUb3QAS
+# uJYBiGIYLIlp8np9+TFg0nHk8o0NqnZBWZgqICZnk7m+fnnsE3Y27zUQxlvSYAFq
+# VdFziBM1HxVrHwdH+4NaPyaYJjx7BF8aq5AU6ebgQUuhje5ejN0ZIPHa0sRWoVGH
+# Nvx7S+mYumN5VrO9kzU81Tjxtr+li/CTrURK0DqUxDTAGl2HyPURjdY0HWRVqFmT
+# MJPqIDFhE+3jc/NQM4YE6Fs7xRAT2tiPRfvI9uMj1e14UjueZOz8Xsa3vmsVOywG
+# T70gmN5DRFqzJagxdKz17XVWrBYB9N/53Fl5Cy5OhX5z7qZSeJS9k6EULVD7WHNz
+# 0bjjX7KC6YUsdRjM92HZ4W3dKeD3pDW09ZqSdI/0EhYvkckkm7ihvgDpCNn2kHFC
+# /NJvJyAkARAjKgGqJ1PY+omyWU4HspOy6Ee/6vbgPbSiBEssIfnrrA5RcijV4Y9+
+# svKXdftRFzaitsYh+OTRfDS4o3zJGfUXUItMg8qsDYNdMao0HHEDHTKX7OxKU53C
+# caG1uXTvopnEJM/elzas2PSlhpOViIbbU1EYjuZzRJXn3ZuHCF03oOgZZHOPnDlW
+# fIdOqlLL+6CPuunILZzjWkfaDkAgqZwKmh58z3jKMZHViGSCvmp70aGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDcyNDA0NTI1NFowPwYJKoZIhvcNAQkEMTIEMLM4hbOAHyn0G3C3Ugi4cCDo1QN2
-# 5eeHmNp55WFN9Rv5yjIWtbBjMwQwvVHdL4Vy4zANBgkqhkiG9w0BAQEFAASCAgBo
-# 1wmaT8ilZzZ3lnJR9pfY7X30xeAx1yGOHm+GXbT+sj8FqSNqW1h+zNLBU1vLKXsQ
-# L/gAgJU9WeznJC+Fhb9Y4eVncX9/NVTMD6Mtgwt52bXAJmN30CGrxgZEZS2ZQnHI
-# A8k6AfYhCnAr0E5f/XNVXiFsjWcTh1VrmauwAQuHcwykFbG6NcTAXhHJhDUVN01d
-# dHsLrsscxnFS5b0azGxdgwtYPCMCWnXG6lnj/n3PVZdPW+f2cxf8LjE6almcd0Tl
-# tt5nytt/TZkFQaEpSteVdWi3MYAmehT9YGO3O/Re1vlJntSq9aXYhJf1w57D1533
-# mWQ7vv37MyhpfnLnXhgm1visj3MIXhl3FaNsWMK/08CrJMX67zoqkOsNh3vD88QQ
-# sOSj9jQNTXUl+04zUnMj0GNpz+zIEfKpGLG1UzIYeh8tiwB+xrWlHgRJSj2lsG81
-# pAYRYFqkyBXxEhG1I3sVXK+OEvdETp/ssjKJ/XUT7wR4iOpbyInJS6oVz2aRyVZ8
-# E2LgR2wRllX/SZIvUuQdeuyhi9dV42scQeMjfO5MrZ5JV6n4fUSWYd5JNHZpnoxP
-# Hdhfjz8nDLnok/bgDLwpVI1C4NthTmSVQs6BgbmLwtW+Kf9YoO6z0f+vpcO0HjuR
-# 8foNk60ahX83xKupXK8vEqwmsTmWnpCT4qRVL7/nxw==
+# MDkxODA1MDkzOFowPwYJKoZIhvcNAQkEMTIEMFFZ3k1CsQ2WjoIVl9+md72YswLy
+# xRPCAoDsfqhMjguyF+ROXnzFXA7JGIqjJPz1MzANBgkqhkiG9w0BAQEFAASCAgC6
+# w8CucIG3LYdWIAr8j8yyRo9JA2K9AdAlxDGnfnvUAqZJu+E9oQIyfyb0/QKxyMEd
+# AHvE/BHGTmzQPRaOtN5A1bJyEUPkL4TnDgpVWpmB0WRABpnVbiU8IRD9f1uxeRE9
+# KW49HeRoLH3WD+a/469hBOXdeE13afw5b0a17x4hmWYwZIhSMQBMEEcVCdUNRsMm
+# cd+2uhU3gYHNYykeuNXrJNkt1GmWHEGwQp6Nmhmu6wzIr+2VgDY97fOKFCPjFYsf
+# D9sU4iPnirFh1ahJA5qG5kS3Iy/16qCCiiGGv5ocbXieRc3lw8BPBPL8w5K9t7B2
+# dxaJmquSBhZqUWs2eeftfSbP6eTxTXRPe+vG6DrKZBdggAPp1thfQtZp33dtP7cT
+# YLWQb/+jxXSeqFGizwtx2WQRBh9+8eYRAl4MRHK82ME4HRr1mJGVOr0Rk/PZ95FN
+# U/LlO0rlKI5IHUsMqcr6O2ns8KzWwIUc5QdDdmftAo0JaStRvGjlR98yYaHd4EPJ
+# dz+UWiqnIcioYeLq+1RPwWW7j88wWewkTUDTDeTiPGkXbNAkn3vCixxq2G2cLqkT
+# IaIkpc4U7s00MJC6tFOkfN9PvjxBpz7FkTGOtq2VSgGwT5tFzu8TOykmjJc5K2Se
+# MLWkjP9HAXXbpoph9k9+vUj1vmVWVBpyLYIv/AnvyQ==
 # SIG # End signature block

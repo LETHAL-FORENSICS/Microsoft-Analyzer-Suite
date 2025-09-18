@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-07-24
+# @date:      2025-09-18
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -20,8 +20,8 @@
 # ImportExcel v7.8.10 (2024-10-21)
 # https://github.com/dfinke/ImportExcel
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 5.1 (5.1.19041.6093)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6093) and PowerShell 7.5.2
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -34,7 +34,7 @@
 .DESCRIPTION
   Users-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of the User Information extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v3.0.4)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieve-information-for-all-users
 
@@ -44,7 +44,7 @@
   Note: The subdirectory 'Users-Analyzer' is automatically created.
 
 .PARAMETER Path
-  Specifies the path to the CSV-based input file (Users.csv).
+  Specifies the path to the CSV-based input file (*-Users.csv).
 
 .EXAMPLE
   PS> .\Users-Analyzer.ps1
@@ -155,12 +155,14 @@ if(!($Path))
         [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms") | Out-Null
         $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
         $OpenFileDialog.InitialDirectory = $InitialDirectory
-        $OpenFileDialog.Filter = "Users|Users.csv|All Files (*.*)|*.*"
+        $OpenFileDialog.Filter = "Users|*-Users.csv|All Files (*.*)|*.*"
         $OpenFileDialog.ShowDialog()
         $OpenFileDialog.Filename
         $OpenFileDialog.ShowHelp = $true
         $OpenFileDialog.Multiselect = $false
     }
+
+    # -Users.csv
 
     $Result = Get-LogFile
 
@@ -365,7 +367,7 @@ Write-Output "$ElapsedTime"
 # Stop logging
 Write-Host ""
 Stop-Transcript
-Start-Sleep 1
+Start-Sleep 0.5
 
 # Reset Windows Title
 $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
@@ -378,8 +380,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUXWiVcpI9ejtgV9oNQ5uueLJy
-# TEqggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUY/h0ppTlIJOLj2LuOuVvYK8O
+# GKaggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -581,33 +583,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBRt1uNAU+YDYjubuOfxy9uQ0R/BjTANBgkqhkiG9w0B
-# AQEFAASCAgARSs7F+GFvf/EaKNYbMHxZgd2ToKzQryjwMzb0efpZbCVOAFk0H7Zd
-# u2BTwi9vh2o7D0nzw1JuNvjb/or3Uzgpy2+/RM6GFHu0uq7hbV/cEUYem8Kmm00j
-# 68MPPFzTrMZWLRcoOfv9DsTJfDPRgnBPX12U/EkaUcoC0nuj29SQd+/ERxXWp9yX
-# 4hN7tM+VWF9ruJ/TdZux3u2pydIaEQcTUdFsjOU6xq8wjpkpEKvn8q40QoqPhuqP
-# 6XpzCot62rqf5bDJS2XRJRBRAmmaHnGU6OJ1AHyrKQC9p0UySQYO/Wxz0eZiafws
-# Pi9d8RSyrX+kNnIGHApQFHa2l7d7UyhBjAN/epvWeG6MmY6dZMZ6yb2t+fDwugms
-# 3s3ut/LEJEk9D7gtUYuO70GJEW9Di0lVze6aSAUSMtxDNVBGXVRAuJxIGgyf8OpN
-# gpAKGpAvGw1j2ku7du/bS68yprtkGcn8yTCmXvsJnENyyGx7BP9lU7qNvq8RnFnR
-# eFZBWyTnWGLQHGKkXrYR/ciHVPqg1qlLTT0OFds8RkP+c04wg3PI5CQ8Y46G6c6Q
-# MVaHS4Qfa7socDt3xq2ELpnL7eStLhJfoYtTNljjWr6QIJOQWKIHxuFmv9MncyTB
-# griH8rbTuyHJzAtguOcg3/lGzKJBFVWADHJ8bZtC4+l84ofVJ03vYaGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTCuP/qQ7zGCDBmzGzEDEnKfvO95zANBgkqhkiG9w0B
+# AQEFAASCAgBnY31Z8p7qdVMRXWnm8r0lstXe+DeMEUOq5eu5dowkjRBsG4MYKTVN
+# ILBLoaH/fXZQaVDWalja99JDn6X96PPzaffKpYQ5TuHBoe2QFF8VeGfSDbySKKeR
+# J5jHFZZa/7wFE/UJFBxHntRc0bQ08kyiN2CfxzRg4eafam5vXWcsvJ7ylDkdOXc/
+# P+p5dgXuepcDfLcdFxeaCGcvgdxRFOVqVL3LPCrN2/ePDJRs4T/MCZQ9ih1tlefQ
+# R3wACM2j94CFm61JDwAZ2VqCbQMRnDFSdJtRc2AlLipWjpM8yl/3vnGQVpNAvG4e
+# RG7IJXP3q1K3XS2krMjfMk+2Z6Jf4jAbiDIRDMvrlQgeJQyvzg3l9GcbY4s7opp0
+# a+p+MVXxYCrHdIjd1Yu8DRFxCzk5wNrAB4HTfLIMyDnCqc9lmVw6G4o7vOWD5OGW
+# Er+q6YoKq17eKJ2zZ8GEv71GlUQHB2o+P81kEKAWLYBG8yRkPNQAVFpncq4uhUev
+# C8aK/H28Okn8f7s31wVhBKDiNC2mg3/IbNy45K6LZm4NqI5HbEDoVGm2O/c5Axg1
+# WIJX5OgcMu080296EK0wGEa5u+xHmgdV0UALz2nqajqQi1/ph4lcUL2Cth3QNIuQ
+# z8n3MYFDW81JfkCFDxonc5nCneE78S3A/dKRC/tZFsJabSH5osFnt6GCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDcyNDA0NTMyOFowPwYJKoZIhvcNAQkEMTIEMNt8fCt1ePZDD/+KGhXDJNouGadC
-# KsCi+qcKe4R6MHh1DMLzmbBhlwnQAiikAOX9bTANBgkqhkiG9w0BAQEFAASCAgBg
-# eG7BvslS2/GC/Kcf4sRJBbOCaI3tkVR+Z4UPY9sFjd9v892rEf4xX+YqutXD78YW
-# fCkZc3+PNoaKpQTf8KhRf6DdzrpWQfaZaJSLHN+bzROA+mIsnlNotUrDj8AZtOrH
-# j6wv79h+Qo/2ftbFPrDsH/BFirBXAAIpmPfsFid7bUnf0WVh4YY6uyTvktbDVuEl
-# jquuRvFQgudchqfH652KFuWQ4bmzm5lG4ldp7iQ5g2pff4WeaBaZrI63PVUccLgU
-# Joeh2QcAo7xGjWN6QNW0ucPP+EgF56Rs9u+tNyIIlGY5ttSZKqzE8Bz5HjdRgHY7
-# hGXknWdBX/HNzk7n29Y6bJxbgpd91LrSInkkqCK/yaKOu1/0Cfq2g+MdP1ogRX3K
-# 9eedP+O8PaaswoyYyyDekORunCXwuur2gFsIo5t/ky/fmNvrirGGW7shNHjTSfhr
-# YFTSgok55s5u9lp0Ga/vFGwnolWNToAHQ3/Wqsdpe56d8zakKJ99QceFjKlW6gVr
-# XzH53qi9L20lxSHtUiF/YEC0u6n9OWm1CAaJF0j1StqGsVkWQs45kvCbGvYQ8b9Q
-# BW529TgwD+kjr9zoSqlmUPw9oUQdrJh+TIZF0AQzn4d4z6F59ik7T9qh/plB6UIk
-# 2k50FyZLnYIxugLfZB+HRQPBhnS6PMbknZDewln31g==
+# MDkxODA1MTAxMFowPwYJKoZIhvcNAQkEMTIEMBYe6bb+e1gTMSjDUTBx2gmcYsUS
+# T099wBBvRfbAgRGo38tVcEaDFyi2UNodp5JLBjANBgkqhkiG9w0BAQEFAASCAgCX
+# p2pRB8oNhpLl9Oer9kLUqki+BEefjrvWicRdtdOaqPB/Ce02X1fwapey2nOWyC/h
+# 0bLiFcXOWUJOk3MHXQEsyPtHk6CQfI1pR7N7sWW+93gop3dsyZOxp5c8JgNGldur
+# ArMm2a5lMXU54HxAsd0YJf9HS+f5g4IHdofAkXPE3BE/K6bgu4coFggR0xXnKPrH
+# qyfsMRl+3jKwlYiNY7oSyHDbFdVS4pMPcph9uyuSzSpwx2tOjzqKf8ZBxxHrMXxQ
+# rANHxE2+HJepRN4IwS90Vc8gVkUfhqV1hpvNBku4GKEs2nJEe1zuwpvoWix7voRX
+# ztOS1fEp0HvGxpR7rlslVWkiySy2bWjB09G+kPcJPxuWk+JOZXSSzODYbQG6zCQA
+# 5RnTmZAVoKDy/vRWGAHT6j9R2NLida3oRB/RYbn2Hvoir5O8fmfsJ2wAIiEfH2Z7
+# NIc+2PQlBEfwet4fwp749mlBkgriYiA+hpCwIdBnaTGH2C1enF3CZtkmYpejwZz0
+# RvLuLvDeCNm7jSBIp/CjuVEZTbOvgal750gR6KbJCS+ZLYgzYiRaPxSYvbmpxNcL
+# pxjri+hBN5lCwRLeQfgPGHQM5MelnjJglrSeQ0M4tkrSWnvp6YwnJWcUUtu79yq3
+# SM5/fjuZhQmLNtQ53eDwRTksXsZen86+R2ELuBETTQ==
 # SIG # End signature block
