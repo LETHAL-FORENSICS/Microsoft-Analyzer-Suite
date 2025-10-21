@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-09-18
+# @date:      2025-10-21
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -117,6 +117,31 @@ else
 Add-Type -AssemblyName System.Drawing
 $script:Green  = [System.Drawing.Color]::FromArgb(0,176,80) # Green
 $script:Orange = [System.Drawing.Color]::FromArgb(255,192,0) # Orange
+
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
+{
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
+}
+else
+{
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # BackgroundColor
+    if ($Config.ImportExcel.BackgroundColor)
+    {
+        if ($Config.ImportExcel.BackgroundColor -cnotmatch '^(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5]))$') # <0-255>,<0-255>,<0-255>
+        {
+            Write-Host "[Error] You must provide a valid RGB Color Code." -ForegroundColor Red
+            Return
+        }
+    }
+
+    # Excel - Color Scheme
+    $script:BackgroundColor = [System.Drawing.Color]$Config.ImportExcel.BackgroundColor
+    $script:FontColor       = $Config.ImportExcel.FontColor
+}
 
 #endregion Declarations
 
@@ -277,8 +302,7 @@ $LastDay = ($LastSignInDateTime).AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ssZ")
 $Devices | Export-Excel -Path "$OUTPUT_FOLDER\Devices.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Devices" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:X1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:X1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of columns A-X
 $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
 # ConditionalFormatting - CreatedDateTime
@@ -387,8 +411,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\DeviceOwnership.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "DeviceOwnership" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -408,8 +431,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\EnrollmentType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "EnrollmentType" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -429,8 +451,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\OperatingSystem.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "OperatingSystem" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -450,8 +471,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\OperatingSystem-Version.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "OperatingSystem" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column A-D
         $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
         }
@@ -471,8 +491,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\Model.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Model" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -492,8 +511,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\ProfileType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ProfileType" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -513,8 +531,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\TrustType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "TrustType" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -555,8 +572,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUdELZjH+1fli3OWnC/B/AU2BN
-# vGSggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU95CcrcVS53NFRLQd59/3a8TV
+# mQSggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -758,33 +775,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBQIxlNRsTaJ0mfplJnU5QRQVKGw6zANBgkqhkiG9w0B
-# AQEFAASCAgBqvno10KBGHYKJr5wR2Zfdlql66J90wUgy9oafVpCE5y8yUKPyWer0
-# e6JEHPmmy2U+OGOFx4FrZh0NMp1dGZYMIWZo5WgO8xVSih2fgvt7I691JGgz3fTy
-# Uxn0ktVbi7YJTNIsdKxu9s0LxOYCHFfRg7tEeicwgb/4P4KT7t8hzQkw/hyGZrvF
-# vH7/b6uqNI8zTtFUmSxyry/Bk8s3LTG5fTM3XgJNjhVX/HOCDLMgn5ygBZAQ/ekF
-# mnJQ8QJXsNO2mgPaQbdn+cAsJ7fGr6cCiP3Bd+yBwG98/Fo579GefRW+61Q4kn4G
-# GMj3BrLUArgqDQcRKTlT2HIqHox1fgHNa+0uD/O14MFukkvXoUqpty3dXcUI16WZ
-# 1V4NCQMi4HW9ohW0lZEwrBanMCOu5ulX7vZcDqNQdVRLiuZFdWp2EaFJf3+O9FGt
-# fAEvaup84Y5kceuJXUHeG57f1R/UNBI5ZKjENkSPYkD80qojBVali6GEG5cN0I+X
-# ye6cg2y+LCQpBMHEQwx/O+wDOMC1yrD6/83+mcGtAJsRPGFsdrGFx1NrWfGdn2H+
-# 2JIjgU1NQKQ75Z71khb6s7Dpx+Ga1D0lL2WU8k4Fjom7ITSfnt9SXLmdVqXj2C5Y
-# LD7OZSCeE7ZnnPvNs94lZAg+HxL44xV4A5LgjYfp4s6Zq9miL+JD9KGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTxm9yDgbtrhjtggMnDi7l78SGO4jANBgkqhkiG9w0B
+# AQEFAASCAgB5bsiV1eCSSWLAF2M0hyoiXOILQwDXDxNcqfdD3tHaWwxMDTblOab5
+# XXX32ObS/7vW8Fv+ISnP2o0On8TjC4GjVUqvCj375LSfMie6DkXuX0tjr0oLsvLn
+# ckJbz4XzP3h0RQ/t372IexCMyZLMTJHr5jtrU9dTsk+S7KtmS9X1Ruh0DsqBxxsd
+# KnEUWyaPdzcSIQfnkwdNGROAXJP3c/4ajMi5WDeO2ZwCLmKWX5j9PUZ731M5ofwG
+# QgeqlkZrZ6Vju57cDZxzUaDWFiTofpKIeH50DWB04uNgknWehrpBVDeOgWav2ovG
+# 6hGggtG+SxoJGIvpmJbOd9hNEV/t5Ibvu/fSP4eNjK/BIGE4I2bYXbFUuxF/HhYC
+# Iab/EzcOwkCwDkVa6lBQ3SqiAh1d9H/XA6TRGuo+cgCeZZ+YTUP3IAAcb5O0D7VP
+# QogIEaTOlsSSW83dX/VosyBPQQF1XxipAPNEzJQO1Af1seglEO4gPRUGjQl/FtIe
+# VgcQ0Zwm9VwPPKtyMyHn+97noO4YXA/2k71D473jDk4lw3KcArjK52vDpJjFBgZM
+# mptDbSW7DBgQrxi4qiHkuXbZ3uA/da+xM6VCKLubKCKMHyZ8OBLGjD5QvUNVOMV9
+# KHu05tQnthK/R+VFw3oLKyoJt4+CmRHH5RMrEdISGk16INyP6p2JaaGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDkxODA1MDkzMlowPwYJKoZIhvcNAQkEMTIEMOnJ4fvLNAn+wH5fmv6G+1Siftja
-# OCSd6A3t/s7KEhLIgTrwun9aUGzpDMfvjLlUnTANBgkqhkiG9w0BAQEFAASCAgCv
-# 9QHAQVCVV88Pdw8/M2z6D1Jf/2AsGSICYqnpEzSBw35J64WmiAL7UrgOed85eYfI
-# FeNyHWBBNSW3onwpOvS5k/BvIRlPStOkq/d1IBHiqooUY4Qhg5r0YfpzpXXqauIG
-# B21M47fw1eM7gpIbb5BAjKZpv9+jEHDsxniox7q6AuFpnV3gblMOAo9UzQrU5bIk
-# mqR4l0pnlMbujuqqkXbjFmavFBE4XvcZ+DRYvQhDP5+T/Ow/UhJGo2KaKIHa0WPB
-# wVHG+f16Q0vnMmpz4S9GCvFTWGoNNdD/yrw/STZ2s6J3fnDua7mvl4QfEAckdJ9m
-# etZKAyT1l3NGhJjxXffsgy37YZncgelfdIXmK62OWrm6T/2i+f2tCH8liy/MjG/s
-# Vo3CqffUT01/BQhjyD8MiSa7sRC0gn65u5sqT1nM4M8dfJKvJUg4pAHbGT8X3hPA
-# B1pc/rXp/n1wSGBD5D/u2w53gTzInFy4YytFbQx3IzgtqOx0EwLksXtLEqQ2H+NI
-# IP0rKDUH5K/yR7W55RKvq3eiJqPtSHijU8NlaLk4VQqbdNZiwHOYEHOHEAb2nQh+
-# N5Lclk8wt0d5AH1i+veEp9GHPzLK8nEcTp1fFgaBqqJGOQF8CYMzD63ZvGjvzOy4
-# OhZRFD0jEPusM8wDtqDuYdSdiGlPriTHYK/tQAsODQ==
+# MTAyMTA1MzExNFowPwYJKoZIhvcNAQkEMTIEMK3Fg7LQCmFqxAkUSk9DL2MLPG3o
+# JLoEci5uEaSN/Crs64Rk8B96duXxOrOp6eh6GzANBgkqhkiG9w0BAQEFAASCAgCJ
+# 6N5P9zc4xpUnR2W7QVK1hP+ichW4UnmvV99ClZIeJdj090DcgEJQ3QIdrDfdr0vq
+# /Vkudh06uC+jXrAdsX1vSwRwxDu4gZEiGCJw8JxDMVw6kg73chULMoiQJ7HpJljH
+# FtYzpfiQ2psncGLzWrhtIyUatzL830qXc/JyaA7LZd8qzJ9bRBGgfs+4OU4kqngw
+# uCW8tx/oAPc/pCDVvw1vTdx1cow1cXVv8G9D786QXvr5B8Nmu0NVbFSPu9k1iZYa
+# AOK5UY4ZVanPCH++iFGkKzDNWN3Nlqusk5DIxJc4X2exjgMC4YBFsbVIncLBZlFM
+# w8PS80lSA8I9sf9dq0mkVumuXqoYkQ+gmokkY5enxsiaMINHkKdA17dDyARzrVIz
+# VzYYdgAVrqvXPO4FzZeqNkuOGaLnMNLHUk4pOBBuqlzeiB24o7c5so3AlMTEQzvs
+# sK1HnVE4x2Wxa/37GiobL1c3PZZy2CISmdpIKYTQiOlvVJ7wD89AQI+cIaMpHcs4
+# b2vGh3d3jyw9J6WVCZVgooCAyNYGP/j1KbXppDEu2TLL18xmqmWX9+rRqSdmnEMa
+# tPOUMDNYKIo0bO1v1qI7AEQCFO/+Kb6RvYzKj4JQBsvpChcogKJOYTjudovzsI6i
+# Ps4Kd5PIz8AM1qZ0oXt5BM2k1TubObfX3MDG5PPhzg==
 # SIG # End signature block

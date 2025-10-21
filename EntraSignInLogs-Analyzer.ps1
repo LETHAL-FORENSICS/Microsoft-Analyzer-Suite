@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-09-18
+# @date:      2025-10-21
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -25,8 +25,8 @@
 # https://github.com/ipinfo/cli
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -41,7 +41,7 @@
 
   https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
 
-  https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/AzureActiveDirectorysign-inlogs.html
+  https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/AzureSignInLogsGraph.html
 
 .PARAMETER OutputDir
   Specifies the output directory. Default is "$env:USERPROFILE\Desktop\EntraSignInLogs-Analyzer".
@@ -173,6 +173,20 @@ else
 
     # IPinfo CLI - Access Token
     $script:Token = $Config.IPinfo.AccessToken
+
+    # BackgroundColor
+    if ($Config.ImportExcel.BackgroundColor)
+    {
+        if ($Config.ImportExcel.BackgroundColor -cnotmatch '^(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5]))$') # <0-255>,<0-255>,<0-255>
+        {
+            Write-Host "[Error] You must provide a valid RGB Color Code." -ForegroundColor Red
+            Return
+        }
+    }
+
+    # Excel - Color Scheme
+    $script:BackgroundColor = [System.Drawing.Color]$Config.ImportExcel.BackgroundColor
+    $script:FontColor       = $Config.ImportExcel.FontColor
 }
 
 #endregion Declarations
@@ -525,8 +539,7 @@ $Results | Export-Csv -Path "$OUTPUT_FOLDER\EntraSignInLogs\CSV\Untouched.csv" -
 $Results | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Untouched.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInLogsGraph" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:BS1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:BS1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of columns A-BS
 $WorkSheet.Cells["A:BS"].Style.HorizontalAlignment="Center"
 }
@@ -749,8 +762,7 @@ if (Test-Path "$($IPinfo)")
                                     $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\IpAddress\IPinfo\IPinfo-Custom.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -PivotRows "Country Name" -PivotData @{"IP"="Count"} -WorkSheetname "IPinfo (Free)" -CellStyleSB {
                                     param($WorkSheet)
                                     # BackgroundColor and FontColor for specific cells of TopRow
-                                    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                                    Set-Format -Address $WorkSheet.Cells["A1:K1"] -BackgroundColor $BackgroundColor -FontColor White
+                                    Set-Format -Address $WorkSheet.Cells["A1:K1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
                                     # HorizontalAlignment "Center" of columns A-K
                                     $WorkSheet.Cells["A:K"].Style.HorizontalAlignment="Center"
                                     }
@@ -805,8 +817,7 @@ if (Test-Path "$($IPinfo)")
                                     $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\IpAddress\IPinfo\IPinfo-Custom.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -PivotRows "Country Name" -PivotData @{"IP"="Count"} -WorkSheetname "IPinfo (Standard)" -CellStyleSB {
                                     param($WorkSheet)
                                     # BackgroundColor and FontColor for specific cells of TopRow
-                                    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                                    Set-Format -Address $WorkSheet.Cells["A1:P1"] -BackgroundColor $BackgroundColor -FontColor White
+                                    Set-Format -Address $WorkSheet.Cells["A1:P1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
                                     # HorizontalAlignment "Center" of columns A-P
                                     $WorkSheet.Cells["A:P"].Style.HorizontalAlignment="Center"
                                     # ConditionalFormatting - VPN
@@ -1017,8 +1028,7 @@ if (Test-Path "$($IPinfo)")
                                     $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Hunt.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -WorkSheetname "Hunt" -CellStyleSB {
                                     param($WorkSheet)
                                     # BackgroundColor and FontColor for specific cells of TopRow
-                                    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                                    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+                                    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
                                     # HorizontalAlignment "Center" of columns A-X and AA-BD
                                     $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
                                     $WorkSheet.Cells["AA:BD"].Style.HorizontalAlignment="Center"
@@ -1234,8 +1244,7 @@ if (Test-Path "$($IPinfo)")
                             $Results | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\XLSX\Hunt.xlsx" -NoNumberConversion * -NoHyperlinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -WorkSheetname "Hunt" -CellStyleSB {
                             param($WorkSheet)
                             # BackgroundColor and FontColor for specific cells of TopRow
-                            $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                            Set-Format -Address $WorkSheet.Cells["A1:BH1"] -BackgroundColor $BackgroundColor -FontColor White
+                            Set-Format -Address $WorkSheet.Cells["A1:BH1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
                             # HorizontalAlignment "Center" of columns A-X and AA-BG
                             $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
                             $WorkSheet.Cells["AA:BG"].Style.HorizontalAlignment="Center"
@@ -1353,8 +1362,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\AppDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppDisplayName" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-D
     $WorkSheet.Cells["B:D"].Style.HorizontalAlignment="Center"
         
@@ -1380,8 +1388,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\ASN.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ASN" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:E1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:E1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-E
     $WorkSheet.Cells["A:E"].Style.HorizontalAlignment="Center"
 
@@ -1403,8 +1410,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\AuthenticationProtocol.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AuthenticationProtocol" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     # ConditionalFormatting - AuthenticationProtocol
@@ -1420,8 +1426,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\AuthenticationRequirement.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AuthenticationRequirement" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1435,8 +1440,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\AuthMethod.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AuthMethod" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1450,8 +1454,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\Browser.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Browser" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     # ConditionalFormatting - Browser
@@ -1467,8 +1470,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\ClientAppUsed.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ClientAppUsed" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     
@@ -1491,8 +1493,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\ClientAppUsed-Status.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ClientAppUsed" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-D
     $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
     # ConditionalFormatting - Modern Authentication Clients
@@ -1514,8 +1515,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\ConditionalAccessStatus.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ConditionalAccessStatus" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
@@ -1536,8 +1536,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\Country.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Countries" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-D
     $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
 
@@ -1563,8 +1562,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\ErrorCode.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ErrorCode" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:F1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:F1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-B and E-F
     $WorkSheet.Cells["A:B"].Style.HorizontalAlignment="Center"
     $WorkSheet.Cells["E:F"].Style.HorizontalAlignment="Center"
@@ -1587,8 +1585,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\IpAddress.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "IpAddress" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:G1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:G1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-G
     $WorkSheet.Cells["A:G"].Style.HorizontalAlignment="Center"
 
@@ -1617,8 +1614,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\NetworkNames.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "NetworkNames" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1632,8 +1628,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\OperatingSystem.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "OperatingSystem" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
@@ -1647,8 +1642,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\OriginalTransferMethod.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "OriginalTransferMethod" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
@@ -1666,8 +1660,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\ResourceDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ResourceDisplayName" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1681,8 +1674,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\RiskDetail.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskDetail" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1696,8 +1688,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\RiskEventTypesV2.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskEventTypesV2" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1711,8 +1702,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\RiskLevelDuringSignIn.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RiskLevelDuringSignIn" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
@@ -1726,8 +1716,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\SignInEventTypes.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInEventTypes" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
@@ -1741,8 +1730,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\SignInTokenProtectionStatus.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInTokenProtectionStatus" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
@@ -1756,8 +1744,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\Status.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Status" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
     }
@@ -1771,8 +1758,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\UserAgent.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserAgent" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
 
@@ -1814,8 +1800,7 @@ if ($PrivacyDetection -eq "True")
                 $VPNServices | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Stats\VPN-Services.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "VPN" -CellStyleSB {
                 param($WorkSheet)
                 # BackgroundColor and FontColor for specific cells of TopRow
-                $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-                Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+                Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
                 # HorizontalAlignment "Center" of columns B-C
                 $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
                 # ConditionalFormatting - Service
@@ -2060,8 +2045,7 @@ if ($Count -ge 1)
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\XLSX\Brute-Force-Attack-Overview.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Brute-Force Attack" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-            Set-Format -Address $WorkSheet.Cells["A1:B1"] -BackgroundColor $BackgroundColor -FontColor White
+            Set-Format -Address $WorkSheet.Cells["A1:B1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
             # HorizontalAlignment "Center" of columns A-B
             $WorkSheet.Cells["A:B"].Style.HorizontalAlignment="Center"
             }
@@ -2077,8 +2061,7 @@ if ($Count -ge 1)
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\XLSX\Brute-Force-Attack.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Brute-Force Attack" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-            Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor White
+            Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
             # HorizontalAlignment "Center" of columns A-X, AA-AV and AX-AZ
             $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
             $WorkSheet.Cells["AA:AV"].Style.HorizontalAlignment="Center"
@@ -2133,8 +2116,7 @@ if ($Count -ge 1)
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\Stats\AppDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppDisplayName" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns B-D
         $WorkSheet.Cells["B:D"].Style.HorizontalAlignment="Center"
         }
@@ -2148,8 +2130,7 @@ if ($Count -ge 1)
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Brute-Force-Attack\Stats\UserPrincipalName-Status.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserPrincipalName" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns A-D
         $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
         }
@@ -2303,8 +2284,7 @@ if ($Count -ge 1)
             $Results | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\IntuneBypass\IntuneBypass.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -IncludePivotTable -PivotTableName "PivotTable" -WorkSheetname "Intune Bypass" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-            Set-Format -Address $WorkSheet.Cells["A1:AP1"] -BackgroundColor $BackgroundColor -FontColor White
+            Set-Format -Address $WorkSheet.Cells["A1:AP1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
             # HorizontalAlignment "Center" of columns A-AP
             $WorkSheet.Cells["A:AP"].Style.HorizontalAlignment="Center"
             # ConditionalFormatting - AppId
@@ -2383,8 +2363,7 @@ if ($Count -ge 1)
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\AiTM\XLSX\AiTM.xlsx" -NoNumberConversion * -FreezePane 2,4 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AiTM" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-            Set-Format -Address $WorkSheet.Cells["A1:AW1"] -BackgroundColor $BackgroundColor -FontColor White
+            Set-Format -Address $WorkSheet.Cells["A1:AW1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
             # HorizontalAlignment "Center" of columns A-X and AA-AW
             $WorkSheet.Cells["A:X"].Style.HorizontalAlignment="Center"
             $WorkSheet.Cells["AA:AW"].Style.HorizontalAlignment="Center"
@@ -2432,8 +2411,7 @@ if ($Count -ge 1)
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\AiTM\XLSX\AiTM_Hunt.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AiTM_Hunt" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-            Set-Format -Address $WorkSheet.Cells["A1:I1"] -BackgroundColor $BackgroundColor -FontColor White
+            Set-Format -Address $WorkSheet.Cells["A1:I1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
             # HorizontalAlignment "Center" of columns A-I
             $WorkSheet.Cells["A:I"].Style.HorizontalAlignment="Center"
             # ConditionalFormatting - AuthenticationProtocol
@@ -2473,8 +2451,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\DeviceCode\DeviceCode-AuthenticationProtocol.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Device Code" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-AZ
     $WorkSheet.Cells["A:AZ"].Style.HorizontalAlignment="Center"
 
@@ -2510,8 +2487,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\DeviceCode\DeviceCode-Login-to-Microsoft-Authenticator-Broker.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Device Code" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:AY1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:AY1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-AY
     $WorkSheet.Cells["A:AY"].Style.HorizontalAlignment="Center"
 
@@ -2547,8 +2523,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\DeviceCode\DeviceCode-Untrusted-Network.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Device Code" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-AZ
     $WorkSheet.Cells["A:AZ"].Style.HorizontalAlignment="Center"
 
@@ -2584,8 +2559,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\DeviceCode\DeviceCode-Device-Registration.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Device Code" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:AY1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:AY1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-AY
     $WorkSheet.Cells["A:AY"].Style.HorizontalAlignment="Center"
 
@@ -2621,8 +2595,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\DeviceCode\DeviceCode-OriginalTransferMethod.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Device Code" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:AZ1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-AZ
     $WorkSheet.Cells["A:AZ"].Style.HorizontalAlignment="Center"
 
@@ -2662,8 +2635,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\CrossTenantSynchronization\b2bCollaboration.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "b2bCollaboration" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-BD
     $WorkSheet.Cells["A:BD"].Style.HorizontalAlignment="Center"
 
@@ -2773,8 +2745,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Unusual-PRT-Usage-and-Registered-Device.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Unusual PRT Usage" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-BD
     $WorkSheet.Cells["A:BD"].Style.HorizontalAlignment="Center"
 
@@ -2853,8 +2824,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\VSCode\Suspicious-SignIns-via-Visual-Studio-Code.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "VSCode" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-BD
     $WorkSheet.Cells["A:BD"].Style.HorizontalAlignment="Center"
 
@@ -2931,8 +2901,7 @@ if ($Count -ge 1)
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\EntraSignInLogs\Alerts\Suspicious-ADRS-Token-Request-by-MAB.xlsx" -NoNumberConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ADRS Token Requests" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:BE1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-BE
     $WorkSheet.Cells["A:BE"].Style.HorizontalAlignment="Center"
     
@@ -3067,8 +3036,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUeGQ+6kgnwq9D3EJMD57dtJE1
-# vo6ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUywvDxa1IKsGe8KCfr8sGUCf2
+# M7aggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -3270,33 +3239,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBRT/4F7rkX+7QAPIitUP1rIgpLVZTANBgkqhkiG9w0B
-# AQEFAASCAgAzxA/3PKTlWBTauZuCQhBb5u28G8YQ/XfBGUn1nM/MuPRSUaUb3QAS
-# uJYBiGIYLIlp8np9+TFg0nHk8o0NqnZBWZgqICZnk7m+fnnsE3Y27zUQxlvSYAFq
-# VdFziBM1HxVrHwdH+4NaPyaYJjx7BF8aq5AU6ebgQUuhje5ejN0ZIPHa0sRWoVGH
-# Nvx7S+mYumN5VrO9kzU81Tjxtr+li/CTrURK0DqUxDTAGl2HyPURjdY0HWRVqFmT
-# MJPqIDFhE+3jc/NQM4YE6Fs7xRAT2tiPRfvI9uMj1e14UjueZOz8Xsa3vmsVOywG
-# T70gmN5DRFqzJagxdKz17XVWrBYB9N/53Fl5Cy5OhX5z7qZSeJS9k6EULVD7WHNz
-# 0bjjX7KC6YUsdRjM92HZ4W3dKeD3pDW09ZqSdI/0EhYvkckkm7ihvgDpCNn2kHFC
-# /NJvJyAkARAjKgGqJ1PY+omyWU4HspOy6Ee/6vbgPbSiBEssIfnrrA5RcijV4Y9+
-# svKXdftRFzaitsYh+OTRfDS4o3zJGfUXUItMg8qsDYNdMao0HHEDHTKX7OxKU53C
-# caG1uXTvopnEJM/elzas2PSlhpOViIbbU1EYjuZzRJXn3ZuHCF03oOgZZHOPnDlW
-# fIdOqlLL+6CPuunILZzjWkfaDkAgqZwKmh58z3jKMZHViGSCvmp70aGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTAN/aGGBDgwh0/TJ3VNaeJDucw5TANBgkqhkiG9w0B
+# AQEFAASCAgChyF+AYFMp2ouE4zlxPYwA3/mpJBQ6NATwS8FcgCx3f1NPhYzOFs0Y
+# AM1cvsOcnPaG1bIPhHorrQXH6FK8hFEpnLa3z6QnkOQBcuMg4SkGhQ0lxbieAv7f
+# 0XpPGBN08ZpfdQoXq146XXxyDvv6deTGkc8a7KHhM9R3S05dq14D37dafTqmSJOt
+# 0meqCh9A9lAYH1QTZp7ve9MmyNbywh0/G8TJRCXLfYADMNvbqJgG9GEWz79nLx6u
+# pLcNLvn82BKiMq7Rx49jIieV8JLVek1R8E7Ius/qRYVT4AybsMBtw5z+eaVPppHM
+# 8mBo8WbYekw3eg3oSmj+hzbPQcSw+cACo8iOsw4wF6xdlQMu1Z/Vfs39UpyDJ+VQ
+# kZJV1BCiy0+B2xJVEE7WSV3ZyZCDB+cXWzIdAKKaf+V+4rVMfgT1d8dAvzy6oCvo
+# RA0nActyUL3Wa9l9yd+4aGeph5j9BN1XBewBBeNPIOk+RfsLErxgu06R5w8dRAfZ
+# /NwX6Nk/+Soy4tLAFH433Vd8VUqQL+uI6oFqUKQNGbxj7zE5600+32HXXcMZoeQN
+# +Qc7P1z6pbUP4FSCSP3UoOipSELCPTShlAv5Z6iRlBeBGflFLoojU4Cgi5zqzAzd
+# S9WLnkfQrHbPvglw8hXpeSEnNFhAB9ZTPAn1IC/ToykoNiSzvY5PnKGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDkxODA1MDkzOFowPwYJKoZIhvcNAQkEMTIEMFFZ3k1CsQ2WjoIVl9+md72YswLy
-# xRPCAoDsfqhMjguyF+ROXnzFXA7JGIqjJPz1MzANBgkqhkiG9w0BAQEFAASCAgC6
-# w8CucIG3LYdWIAr8j8yyRo9JA2K9AdAlxDGnfnvUAqZJu+E9oQIyfyb0/QKxyMEd
-# AHvE/BHGTmzQPRaOtN5A1bJyEUPkL4TnDgpVWpmB0WRABpnVbiU8IRD9f1uxeRE9
-# KW49HeRoLH3WD+a/469hBOXdeE13afw5b0a17x4hmWYwZIhSMQBMEEcVCdUNRsMm
-# cd+2uhU3gYHNYykeuNXrJNkt1GmWHEGwQp6Nmhmu6wzIr+2VgDY97fOKFCPjFYsf
-# D9sU4iPnirFh1ahJA5qG5kS3Iy/16qCCiiGGv5ocbXieRc3lw8BPBPL8w5K9t7B2
-# dxaJmquSBhZqUWs2eeftfSbP6eTxTXRPe+vG6DrKZBdggAPp1thfQtZp33dtP7cT
-# YLWQb/+jxXSeqFGizwtx2WQRBh9+8eYRAl4MRHK82ME4HRr1mJGVOr0Rk/PZ95FN
-# U/LlO0rlKI5IHUsMqcr6O2ns8KzWwIUc5QdDdmftAo0JaStRvGjlR98yYaHd4EPJ
-# dz+UWiqnIcioYeLq+1RPwWW7j88wWewkTUDTDeTiPGkXbNAkn3vCixxq2G2cLqkT
-# IaIkpc4U7s00MJC6tFOkfN9PvjxBpz7FkTGOtq2VSgGwT5tFzu8TOykmjJc5K2Se
-# MLWkjP9HAXXbpoph9k9+vUj1vmVWVBpyLYIv/AnvyQ==
+# MTAyMTA1MzEyMFowPwYJKoZIhvcNAQkEMTIEMNN/LsJIcUbYa/l0BVyyGe/E8Ed6
+# I3pJZYTnQKN8uMnBH+b10tBJUBVpUVBJ0TtWVjANBgkqhkiG9w0BAQEFAASCAgCq
+# xo6/YnnnbYIQYGgv4AdWBUwEjQ5dSFanIDR6aRcLrUnsL+C3El4gLwYrJ5EDz7lN
+# 7QihqYZggDdBYnOTQP3fXPeLJEMVX9up/1smeVFSdGhA3cq0BGPAzFEujkvhoN/j
+# c0bpMKbtiP+0ymlY3FwQ/5ExAxrfz7y6KsDohAIs8s6gZI/i7ssqAweSfABZQbCr
+# y8dPED2KmRXELKVnUgVIxOQw06eMO56aceZo1F2Qeg/1kya8vvX3x9MpNGY4dW4X
+# Fj22HFN1p6oDoeJyWnEDslQHbpQlMQUFh/bPgjRapUA/Aj6aJ8bimRqy5HbzLfIz
+# UcvejZCLYH/VoPR9Wg7vfnZLRwnD8j2rU1ptqsIUley6knIoUXmTJ8BHUwOYBmit
+# LE5kqwPID8oeygttR8pHj9MILVsT2evbkbYWE++uu6o3jOOPC/su1io8dCwKFmzs
+# bQXi2jppE2hACms3f7uAKvvYOI1EOmTo+4wkuCK4XqFtf02D1lQqpUkNivksf0ng
+# bZ8alAAa8BLtZ/HJ5cAa9ae7lqM/dEvv9OvvdhAELDE5pT0eTouKjcwECgsTS3ns
+# P4HweHlH86YVyu2TOMV5DSYSiekE4GsYW9V8UIgNSJBsVwkGEbHvGPIuGPCB5L/p
+# IgUkUAQGGWs89gCiAq2xMWJjcGmmmP/uKyT15Ji0EA==
 # SIG # End signature block

@@ -1,4 +1,13 @@
 {
+    "ImportExcel": [
+        {
+            "Name": "ImportExcel - Color Scheme",
+            "URL": "https://github.com/dfinke/ImportExcel",
+            "Note": "Choose your own Excel color scheme (Optional)",
+            "BackgroundColor": "50,60,220",
+            "FontColor": "White"
+        }
+    ],
     "IPinfo": [
         {
             "Name": "IPinfo CLI - Access Token",

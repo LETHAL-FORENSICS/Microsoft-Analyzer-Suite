@@ -2,6 +2,14 @@
 
 All changes to the Microsoft-Analyzer-Suite will be documented in this file.  
 
+## [1.7.0] - 2025-10-21
+### Added
+- ServicePrincipal-Analyzer
+- Config.json: ImportExcel - Custom Color Scheme
+
+### Fixed
+- Minor fixes and improvements
+
 ## [1.6.1] - 2025-09-18
 ### Added
 - Admins-Analyzer

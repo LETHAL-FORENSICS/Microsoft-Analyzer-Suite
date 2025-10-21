@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-09-18
+# @date:      2025-10-21
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -140,6 +140,34 @@ else
     {
         $script:OUTPUT_FOLDER = "$OutputDir\OAuthPermissions-Analyzer" # Custom
     }
+}
+
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
+{
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
+}
+else
+{
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
+
+    # BackgroundColor
+    if ($Config.ImportExcel.BackgroundColor)
+    {
+        if ($Config.ImportExcel.BackgroundColor -cnotmatch '^(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5]))$') # <0-255>,<0-255>,<0-255>
+        {
+            Write-Host "[Error] You must provide a valid RGB Color Code." -ForegroundColor Red
+            Return
+        }
+    }
+
+    # Excel - Color Scheme
+    $script:BackgroundColor = [System.Drawing.Color]$Config.ImportExcel.BackgroundColor
+    $script:FontColor       = $Config.ImportExcel.FontColor
 }
 
 #endregion Declarations
@@ -467,8 +495,7 @@ if (Test-Path "$OUTPUT_FOLDER\OAuthPermissions\OAuthPermissions.csv")
         $Import | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\OAuthPermissions.xlsx" -NoHyperLinkConversion * -FreezePane 2,5 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "OAuthPermissions" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:Z1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:Z1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns A-Y
         $WorkSheet.Cells["A:Y"].Style.HorizontalAlignment="Center"
 
@@ -679,8 +706,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\AppOwnerOrganizationId.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppOwnerOrganizationId" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-C
     $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
 
@@ -713,8 +739,7 @@ ForEach($App in $Applications)
 $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\AppDisplayName-ConsentType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppDisplayName" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of column B-C
 $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
 
@@ -770,8 +795,7 @@ ForEach($App in $Applications)
 $Stats | Sort-Object AppDisplayName | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\AppDisplayName-AppId.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Applications" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of column B-C
 $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
 
@@ -824,8 +848,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\AppDisplayName-AppId-AppOwnerOrganizationId.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Applications" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:E1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:E1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of column B-E
     $WorkSheet.Cells["B:E"].Style.HorizontalAlignment="Center"
 
@@ -901,8 +924,7 @@ ForEach($AppId in $Applications)
 $Stats | Sort-Object AppDisplayName | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\AppDisplayName-AppId-AppOwnerOrganizationId-ApplicationType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Applications" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of column B-D
 $WorkSheet.Cells["B:D"].Style.HorizontalAlignment="Center"
 
@@ -968,8 +990,7 @@ ForEach($Id in $ClientObjectIds)
 $Stats | Sort-Object AppDisplayName | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\ClientObjectId.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ClientObjectId" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of column B-C
 $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
 
@@ -1010,8 +1031,7 @@ $Stats = $Data | Select-Object PermissionType,Permission,@{Name='Description';Ex
 $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\Permissions.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Permissions" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of columns A-D
 $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
 # Font Style "Underline" of column C (Link)
@@ -1049,8 +1069,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\PermissionType-Permission.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Permissions" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-D
     $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
 
@@ -1101,8 +1120,7 @@ ForEach($PrincipalDisplayName in $PrincipalDisplayNames)
 $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\PrincipalDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "PrincipalDisplayName" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Left" of column A
 $WorkSheet.Cells["A:A"].Style.HorizontalAlignment="Left"
 # HorizontalAlignment "Center" of columns B-C
@@ -1122,8 +1140,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\PublisherDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "PublisherDisplayName" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     # ConditionalFormatting - PublisherDisplayName 
@@ -1139,8 +1156,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\PublisherDisplayName-AppDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "PublisherDisplayName" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns A-D
     $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
     
@@ -1195,8 +1211,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\ResourceDisplayName.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ResourceDisplayName" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1210,8 +1225,7 @@ if ($Total -ge "1")
     $Stats | Export-Excel -Path "$OUTPUT_FOLDER\OAuthPermissions\Stats\SignInAudience.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SignInAudience" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
-    $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
     # HorizontalAlignment "Center" of columns B-C
     $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     }
@@ -1282,8 +1296,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUVizQmFIM2At8qHVbc3F7FaDi
-# 8fWggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUdrJx9OyOx6k2MadrhO7Rko7e
+# 5kGggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -1485,33 +1499,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBT6O0zc0q6JCA2mxGwD0gMFvm/M3TANBgkqhkiG9w0B
-# AQEFAASCAgBfRAyjym3MGbTN9gyXtg4fSWiMLzTp6q6PuQUdoaN6PzzW0awG5JUp
-# umxD9XH8AjBgh5UoFwVs0DYyyY5AL4aUT01uQ8K4G3ym3rfQP+FlYKZaqlTtzR0/
-# VDOTCVegrc50LD7ZArqgIAEe5GGShYDqRkNk6sALUfDUTQHh163FVH/Cophxdmkj
-# nkaFqH26J7D7b4FYnkg8wM/4L27PXE7SGDyeZ1DP6vsjJsV1ctU987JopxRH4JjK
-# oPjl2pakzoFOebx1s2wSKG0xF7OE+/i4Xfb0nq1RbV57I/zlfNXUhKcgVAwMgLeB
-# CV8yST1bYyN/0RW7heyJtHmHX4agsoodx5/LsLY8AMjK8CKEslvMMvfOhuXctAk+
-# bYhCI0Y8InZGN7bGbmBcQB6YV1wjm/obxIJeJAepUER0b9kfXPjf3WhHymggSpzF
-# wX+BvB/Aq239iT2LJzDjuOLY5Y9bhT9RyxfVOm30dthIv5FXcfDtLsTky2FHDQZh
-# ARnrg+xH5K9SLGPfTJ+7Sx49K7IAIR2lIFUTr9rjdvl1CWI+Mez/5xnZiPga9czf
-# WcYq3ZaMJ68pgCB3FAA92sll1YF2ZRmvhiDCDg3B+nD5XGL26D7rxC6EfiP6fPYn
-# z2lUV6o4QtW40CMLI9nI9zltjsJC1fVb6PcBPyu3AGtKzWjdJ5odkqGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBSHtwRCYbcVQXdc5RwC2lfcUWwLCzANBgkqhkiG9w0B
+# AQEFAASCAgA1TQELe1OtlfBVSVSrUtB1ybWMh3pAF8LTdPP/OYr4yTA9UKEOpSiC
+# Mcj+ovv/AN3NoDz/DhEj9WYRu/cIZvd2IPW/H/XJdxGqbpNu1wJuirjsU/JQ7Zhk
+# liADGD4S+Cv961hxOT7J17KYa/Yk9pW1JCOf8mXP0eBXVBpU3wGlyysZwIkPUZD9
+# N2s2M89Qj5T8TEb/6neil33Wu7/nR55VFPECGUzike2JTBXydZSElieIc904M4jg
+# c7j9WOYMje1auBz96a9DOdrhKO91JYVo/F4Ku+KUWGsxhm8tFysI4as74+YYcK5Z
+# m3+gO2qIh687F7O/JuUvNHyWn259uSyRjWECm72pGyr4Qt9N+YIMCnjutI3QcqXf
+# nT8/ufhpT4CvviVhHs45xKGkAkMFC1VGhJ022bMPtqn8hTOrlpFA/eZmEvPhl+Zd
+# 2zaygQGwgvjQuqdh5L+8VAReypqx8CVGk60VJFLK6k3Pv/el1hXNbRZuQr0v/r0S
+# nWpJRbV8zf3LrTNnVAIBJUga9NleyXiw/5ZCWZAADK4FA9oLumjF+NZc8piwCbCw
+# 121YOj6OXPmRiEGFwQ8+mNhWhPaznm9+Dv3nPQleNwfJC+ej7N3xll/78epPu6Wj
+# gTKzInOQMfFcxNRrBVmzQDylPteypgS5Vxu5ZK+SqP5sTg6jSw7A/6GCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDkxODA1MDk1NFowPwYJKoZIhvcNAQkEMTIEMGMyfL9WlBNlqfGm0I1s+2CS/SCR
-# C6Rv9Nymxgqt73r6Znu1XTRt+0nZ67jFlTeQ6TANBgkqhkiG9w0BAQEFAASCAgCz
-# JHtyW4aDTCR4A2BmqTwwcZr+u5ymORGYqltHsn+fkn0CHmmgLFCGZrdT3yV9usSy
-# 7+0cOaN+Uu438DpdEf93GPWY+GYsCXeI2mtg+4IxrVzQYHD8xOQlBYotd3ZSAr24
-# ZW2UQIm0uyl0uTlkmc3g+I+BCXJnC4qXGnltJgZxSZ+t4/LFpVaYlXxlJwFGpmNX
-# hizK+5LDqd9FgaFae91Aa3ZeZhhk71eMPoVexQpGbAKlzAk/ynChHuD461W1dLfL
-# rjHIVvHw0uGBu9enBXcmfH1JTzG0EY2I8dyz5SW2OpqJJZUAxaINyTv6FUAHnBWn
-# Xo9K3S0jsFemnHfGMrs0HEaEO9sOkbfeb5AZC5iTEe30zTSM6oI7kL7H2UmTSbYM
-# w5kVs+Ijd0JarvnsH2OCChcOkLUR73QJOe4C0EvuWCpdKwqjE96woK1DDtXtphIU
-# FeADLfe1410XlmS+ntxGpZrmuLWnbHF3tmrQJFWKi2x8I0NcakFJrO7Yeftft6S4
-# epoIb9wLVFF9OxXV2IRFu8fpt0PBTGquIOUHPB/Bd6Q2ouRKaAM3AzNO4GpTKjKT
-# Yl54ef4sZWKybDhCKuFkMhywfoZWDQDkggpSz7xuboK7JLGKl6ViuNPzE2PpJkyN
-# GIONAUtqIvzy7jH3xzxnVzTf0FplkRsm+kuDn6b4GQ==
+# MTAyMTA1MzEzOFowPwYJKoZIhvcNAQkEMTIEMNFAcXtMtHGA7i1DJpGiBVVz4SeM
+# giU3Nyk30mdvBhybzKqpaQBsbo5B3Rd9EI0ArDANBgkqhkiG9w0BAQEFAASCAgC1
+# uRCJqQesQzDvngzV8wv/gP6Yxc3DvZyS9wKKoWfeg99jdabNEoJwfxuSzrdQVMRf
+# xd3R2z3n9R9PqYydjX1rVbdFS6oPc3L4XgHSutyHusHL8/AP8q6uD8XujTo1fsF5
+# EANqI8XCF3mt/hvl8VsAa3BLcJLtuT2XHrTy4hbjXJ8SxiWjC8oS4LJandYpEY9j
+# D2k0YKtr1mjflx9+GF9nvL95kjUnO036bsP7KEg8NfXV/ZvG/KeCz55gieeBWxti
+# Wg9vZ4e6QY7tkNTaI7rdKG/OF73iwppYZs5eu4+7RviidvJ9IsKazCMy2C2Msm31
+# y/p1Qgk3yaYEOFsRT3ILdv9zGxOVcBESLzH+ufV/XW0ITx4+9AL0r3+ACxMadAmY
+# 93AkBQoLA1Lt+0RE+qVEIV2At2h8g+cJXUWVrRPTLcoC96uxX1QyK8SXdAQZrvrq
+# nd3JnGEXWkPvmzSG0+rQ+zamPWpE1cXHlnggyUJYmhQaJdVEPBSMqWj2+TtufvlY
+# RewdTZ6ozbl4A7uj1ohKcgklWoRMzWdflvDY+sWIvp7ecwd9pHKxvcXbBl5npxvf
+# hrVADrPXPzAQWIOdLsZir3RzzUXg6xvoX3qQyjL0Ogkp4gHr27HtWKB7CV4p51bh
+# SgFho095SZt6QjVYODJXaBhSa1YLl40fam1hSE0PUw==
 # SIG # End signature block

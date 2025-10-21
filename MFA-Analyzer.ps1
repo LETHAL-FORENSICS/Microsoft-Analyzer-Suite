@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-09-18
+# @date:      2025-10-21
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -99,6 +99,34 @@ else
     {
         $script:OUTPUT_FOLDER = "$OutputDir\MFA-Analyzer" # Custom
     }
+}
+
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
+{
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
+}
+else
+{
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
+
+    # BackgroundColor
+    if ($Config.ImportExcel.BackgroundColor)
+    {
+        if ($Config.ImportExcel.BackgroundColor -cnotmatch '^(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5]))$') # <0-255>,<0-255>,<0-255>
+        {
+            Write-Host "[Error] You must provide a valid RGB Color Code." -ForegroundColor Red
+            Return
+        }
+    }
+
+    # Excel - Color Scheme
+    $script:BackgroundColor = [System.Drawing.Color]$Config.ImportExcel.BackgroundColor
+    $script:FontColor       = $Config.ImportExcel.FontColor
 }
 
 #endregion Declarations
@@ -292,8 +320,7 @@ if (Test-Path "$AuthenticationMethods")
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\XLSX\AuthenticationMethods.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Authentication Methods" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:K1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:K1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns B-K
         $WorkSheet.Cells["B:K"].Style.HorizontalAlignment="Center"
         }
@@ -397,8 +424,7 @@ if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\MFA-Status.csv")
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\MFA-Status.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MFA-Status" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns A-C
         $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
         }
@@ -438,8 +464,7 @@ if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\AuthenticationMethod.csv")
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\AuthenticationMethod.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Authentication Method" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -544,8 +569,7 @@ if (Test-Path "$UserRegistrationDetails")
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\XLSX\UserRegistrationDetails.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "User Registration Details" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:O1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:O1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns B-O
         $WorkSheet.Cells["B:O"].Style.HorizontalAlignment="Center"
         }
@@ -610,8 +634,7 @@ if (Test-Path "$OUTPUT_FOLDER\Stats\CSV\MethodsRegistered.csv")
         $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\Stats\XLSX\MethodsRegistered.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Methods Registered" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of columns B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -652,8 +675,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU8ZdCP2vCq9qys5MoIItuBVdf
-# NvyggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUM/9DJiY7u+f9U1tDWSbgNVBU
+# cnyggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -855,33 +878,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBRBqXiSGQKLsmtEB729ZLrvwatF8zANBgkqhkiG9w0B
-# AQEFAASCAgCA7nxPBerQEWUrFbGXEzINwLGhSe8uHaetzkUYHxxFWZqMZs1vpxge
-# COPvHKElQAJS8aDeeRpvu/Kv+gRphsA40rupj5F6LbNm9Wjb9augK+H9oFHganio
-# MdZjicAt0OgU/ZIfYVFVlmxiR6Gg8B4uwYkDKU4Tz0e1Zd/BhMpHiqAkFWMryvO6
-# c87551zOUKrUgxeykZcecaNZnZfXorkfx3hVo1BhngLqtBd7I85JiX6rFw1SqN1t
-# yeosgV1m2eE+Qc7FaVPid3E6zu/RUzPWRiSfPuVhm6rHkqsOcZhdNzUfnoDqfbxa
-# d5R4TPGp6XL/cioaUQhi53qmL21ztadTLbp1A/EM/96+nKK1Mbups/H8BGG8MOSj
-# /Mx3rreHwd7sc3kIhEH9cvaVtHmLRgvZyNSLEZk51ZNpo4iueczReuVWs0Po2yhb
-# ojbUZKLIhDXSV2N1z9xbb7DpyaJYF8AvtFovP2uy/WSKQpKBdCqwnR23ijwVx82Y
-# NIpaSjv1B36Rdx3UNfGsoDlLyCCQ7dl1Zq0SHZokIBZZTQq76WL1UbOAjmcXM/5e
-# jPjS1pQtzUIkQeB+NyqcrPwxtc5CCdBGxXMKOY658OsCSsuLa+h7ebCB5qvtumWQ
-# wOUKhob8qeWk5vREIxXPC8s1bs7bCZlr3OKkaiE2lc+p+yaY7ZWZzaGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBRhKGBQnRgwwA0wo0sqrztxj3NcjzANBgkqhkiG9w0B
+# AQEFAASCAgAMSVk/+t1o1uDNAIHB3yFGBV4AsAxNB2tfXSC5VVmHwQGooxrMocdw
+# 0sTJsiNUceisR2hBCW+V6J+KHxsgUT2CFgcPqtdfqEuyxhpLmDpReuCCQbbVaB1i
+# egpZvymGcgVctH6LfTSSXA334UmMYVWYi4NOmPCw1SnQtDoftdhv/ae10QZsbEdr
+# hkEectELq3pRM/6sBAhl3h3GIyvkKiMQ6pM8cEMkeQ3Pih9FicxgBaGBZ7bNYqay
+# 8j+zaZDVUsX6163OzeL0GXL04xPFUmLf5SBA/sb8ZfR2ezk2vo6erUj2jR5a0pCi
+# JrGuBpuwxr15HVKh4V3tBeLHC9f2+QFQY1icOxHUP3ppyGgGpp2L3W3tCccSCW3K
+# UsxgZ5nrN/JU82xmF8lqLN/j9KE24kX4E1Vr+nZuNudgxbxNG4PlTK2koSXTWpMf
+# D0tUpsokMr6oh9mv1rxYVMzNXEgIHPaq6adyO9i0ON+FSHdaSl6i4hip+wMc3hb9
+# coz3k3EbPyE5TGSY8vHnpTCQWPJC8jMkhJc8hpI/44GD+PdDSXPQNq5po86jq1nm
+# 4Zmh3GN0rh9t5G9GgjZpXJYtiGEWxyWDwvHYAz2IGZSsRNJYlr6vZGlMiHwqHJQo
+# aLivpHyBlz2aCTg98PmBSDLRo+NdY2z7dE5Yv7ZPI/CcpsfDh+lECqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDkxODA1MDk0OFowPwYJKoZIhvcNAQkEMTIEMCy0fHqjiG4u1A5ggPweu/adZCl0
-# M712QCDbGINMKo5YCGJ6/EmG/VymNx/Y1CCFjjANBgkqhkiG9w0BAQEFAASCAgDL
-# mWf2lAyhu0VbNSGhBv7ptn8xS8+i0s+cCF4vma0VFxUPCBIxpj12DrRRbSpUQoCC
-# m/2UpdEvMAL+Opjupm5eo8Q0DH/QwCwC1Isk8l80Dj5sNFJSoM+vzB43fMwm+BqR
-# mJA++kEVVCkUI7zZZeIxhkeLTcrjZ9EnuIjquhBDQ1o6Gc/1IXCsmS6c3lQjOmYI
-# ErKConwfqvGXb+nDapfctuip4RXTOAKuQxOzu3mgo786nDlLAjp0sTr9EO9w9V5y
-# Ety/U67qTOq7Qy+PL+aTBHvn9Lm1eqh338BRagKjK6YoEE1pD1t27WnPnpKri9lJ
-# QkdGpjZUEYvY8YtFKA7b+7HV9Nqx6iHs82uinZlf376LDiyqc7g1ECg70q4g50Oq
-# WxYzsnobirKYeRfUyMxq14F2hMHcJ0tS0MHiq5pIFloM5Km1H7VGrmJORmtTAwRn
-# iVQwuZYEm3pFWYoT0BO8UMgUleitvFMLz75WRgmP0N2cNHGRKNryy3RF83PGQdx+
-# UlCT6bqFr+H1BP8SpryoWuN0vbjgcKM9oWLADI9Zjyu/As3+Jr3DQ62akCR8II6Q
-# 9nprN90V+NUiQBQnP9od3VBeCcpgqh3go3/zbf1xR5a+NK7MsZu14nLior6wM1EY
-# Cn16YcwjfL1i46kGjmGU7/81/UKpKr92avQIV5xDGg==
+# MTAyMTA1MzEzMVowPwYJKoZIhvcNAQkEMTIEMG+ATssCYBxev7eIBMlWYgIa2qtY
+# BTi6q8OncjcgvEOitSEJBqy3bmGWdwukbScvEDANBgkqhkiG9w0BAQEFAASCAgBe
+# l2xlH5q7apzVWHGn8qccR8umpucMXd1vXz4RGMfN62u4Rw8z2zdtZYIkCTuLAULh
+# ahMKMluT1EtwEgVppQTyiwXX2z3o/ayIxt+iogSNuICCQxIKqAJYCMimki/Lh0SH
+# OGXYyYujcsEp+nD1b6pAA0UlR3lwF1ryeWrJp8cQi2WL+d6fjNM0cIjRjD+kes9s
+# BSntG8e9mq3TL5vMtA89I1dlAr4l9GKW4T2XSENHhAAOocGFcNvKy7b/TwfxXQWI
+# l3wOfzSxz+STCd1HFdO4laWe6FR3lSpzqzPnDbWys3IW0yd6o7Evhx+qW/bd7J12
+# OaEXxmEbrOnOCOtl3hmSt4nkJnT1HJB/ah2Q2a3z/XNP1vFrnUFeTXq891XFB56b
+# OvV/TnPMmbADNkPwt8wHGWxweZB9kV3gm3gbWCa+ozxXPCeCXjHRTZCXhDeUnF/C
+# nFPA4ONPLeNloWo32OcquUkFeUMXoEoxJtqyEVvneWcXLhwgOZjIQisDHjCn39vN
+# MBQCD7NemHc1iU3YA/sqXKStf3KhXC0RPj/C3jiyqF8W/9Ec5oVn+qmNKlUM0TCK
+# NWIW/imayc8yhLMrX21R/OlDK64D6ifE6speU7IDCFIbBQffzV5Di/Np8FlVCeP1
+# iKKyu68y5SKpzCxkp7fBJlMCbjFvW/tM8DTcWyTJZg==
 # SIG # End signature block

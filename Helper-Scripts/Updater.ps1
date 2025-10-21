@@ -789,6 +789,10 @@ if ($PSVersionTable.PSVersion.Major -eq "7")
 # Set-PSResourceRepository -Name PSGallery -Trusted
 # Get-PSResourceRepository
 
+# Install-PSResource -Name PowerShellGet -Version 2.2.5
+# Install-PSResource -Name PowerShellGet -Version 2.2.5 -Reinstall
+# Install-PSResource -Name PackageManagement
+
 #############################################################################################################################################################################################
 
 Function Get-AzureADPreview {

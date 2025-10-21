@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-09-18
+# @date:      2025-10-21
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -21,8 +21,8 @@
 # https://github.com/dfinke/ImportExcel
 #
 #
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 5.1 (5.1.19041.6328)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6332) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
 #
 #
 #############################################################################################################################################################################################
@@ -105,6 +105,34 @@ else
 Add-Type -AssemblyName System.Drawing
 $script:Green  = [System.Drawing.Color]::FromArgb(0,176,80) # Green
 $script:Orange = [System.Drawing.Color]::FromArgb(255,192,0) # Orange
+
+# Configuration File (JSON)
+if(!(Test-Path "$PSScriptRoot\Config.json"))
+{
+    Write-Host "[Error] Config.json NOT found." -ForegroundColor Red
+    Exit
+}
+else
+{
+    $Config = Get-Content "$PSScriptRoot\Config.json" | ConvertFrom-Json
+
+    # IPinfo CLI - Access Token
+    $script:Token = $Config.IPinfo.AccessToken
+
+    # BackgroundColor
+    if ($Config.ImportExcel.BackgroundColor)
+    {
+        if ($Config.ImportExcel.BackgroundColor -cnotmatch '^(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5])),(([0-1]?[0-9]?[0-9])|([2][0-4][0-9])|(25[0-5]))$') # <0-255>,<0-255>,<0-255>
+        {
+            Write-Host "[Error] You must provide a valid RGB Color Code." -ForegroundColor Red
+            Return
+        }
+    }
+
+    # Excel - Color Scheme
+    $script:BackgroundColor = [System.Drawing.Color]$Config.ImportExcel.BackgroundColor
+    $script:FontColor       = $Config.ImportExcel.FontColor
+}
 
 #endregion Declarations
 
@@ -263,8 +291,7 @@ $Import = Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Sort-Objec
 $Import | Export-Excel -Path "$OUTPUT_FOLDER\MailboxPermissions.xlsx" -NoNumberConversion * -FreezePane 2,4 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Mailbox Permissions" -CellStyleSB {
 param($WorkSheet)
 # BackgroundColor and FontColor for specific cells of TopRow
-$BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-Set-Format -Address $WorkSheet.Cells["A1:Q1"] -BackgroundColor $BackgroundColor -FontColor White
+Set-Format -Address $WorkSheet.Cells["A1:Q1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
 # HorizontalAlignment "Center" of columns A-Q
 $WorkSheet.Cells["A:Q"].Style.HorizontalAlignment="Center"
 }
@@ -306,8 +333,7 @@ if ($Total -ge "1")
         $Stats | Export-Excel -Path "$OUTPUT_FOLDER\Stats\RecipientTypeDetails.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RecipientTypeDetails" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        $BackgroundColor = [System.Drawing.Color]::FromArgb(50,60,220)
-        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor White
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
         # HorizontalAlignment "Center" of column B-C
         $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
         }
@@ -362,8 +388,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUFsUro6RMe5xvMfG3vxvIWDIL
-# WE2ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU0t0+7vRp3/JKtLrVn5tzbpqO
+# X4iggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -565,33 +591,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBQZ3cuk2yVq2WBFOVIwzINf5gCdCTANBgkqhkiG9w0B
-# AQEFAASCAgCPR/5O29XEid9Q5/IqX5hyrsnANG0Nnlo8qhBY0PNhlctA4HgNSgXf
-# vd6DVnZWH0NAdyKZI+1/gpu6OJy0cska5b9leHMtse9q+fIX5aRMOQzP+l6GGjzS
-# 1xtdEFJk19OJ7/hASreWJcmN3qFRe6rFK2JD2oB+4Ah5+cw+N7jjudvwFojlnu/8
-# 1YkXppgAnzpSIcFQnDFut5L4O/7nkcD6LZiLE5q0p/W2pVQklvgrPXaAX9dQhljX
-# DtpsvM3NF6c23NAdz5U1LFBxRXkkapNPEP9NjdNHmcL1vG6px1Or1KYm2k9uXQbv
-# fZxed9+/+VTLhn4a8HYneK3lOQ0/K2O/Ud4jkJfG0FlVVn9Ka8SeFLrUL5ydUhxf
-# nHK7qw1qF9Z7fr14BUhm27Jds6GDZINRrIQYhdy3v36hLRdEqLMThf1GZwjeVdR8
-# hOm4bcCYPmI7y1LQsSvBBVXyr6fwLx7st2ZMEMv0XbVUTdBg/EQm0eNFFJfLZgUj
-# mq8fJ5SHFm2fzFRo5iYSydJTBtV0ZHpupe6VNgPuJdmny5QfyRXx36zMoce/JL7z
-# sNIivNvnP92JaXjD7obq0fMDLQ4R/PmV4oaYREH6H6fBNrvTVS0zPDHSTi5eEe3N
-# j/MpjrbOURo/MUSjaPIMwUGfvCMxGkzp0yiOXe8W9flTlysDhrWDIKGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTKDZT7xejmTf9LDd5yQ2wLqRE/FjANBgkqhkiG9w0B
+# AQEFAASCAgCwK263s1U2SIYIUYy5MRZdiQnOCE8FOx1elS5Ikj735rCgATPn0zlU
+# faX7uwD9uPgvyBLwIWSgEX7uru9llXTMJGZoSxOLi0PvPqRAFC41GTzQz3b6HZCe
+# AuSbNlzhVBqlFNLuI04v8ktR4O0+ByRYIfKHP7EUBn0E7db4Ohn4+tU/rO2S+/GG
+# va03dcM9RG6mfLrYk34Rmr8r+jif96mYg7ooiL6C0BNCfWIMAVdKGk0nsyvr6eNH
+# dUioTnWQ+kB/Vs6ySPggXH+tPzoXERDo/kJvogCHMq0K+pIkCtOp6faAcoTLF239
+# tGnQ1pxTVEQWbnFoDCyWDYg8hYfeGPj4qGU7/iLqoddO1B4J5DRFV6SNvHxxIqe/
+# prZy62dqGTujNvgbjB6TgYiXkFMMC566CXgulIczTBwZ2vMjQXJBLtpCPfXL5VRT
+# qJswKdZOGl6GYozJRba5dqDlm9X6aai6V+Y6LFTrcFb6OjT/MvUL9ORrrjJi8/OM
+# Cq2Xt9NsXbDlQocrClga4SBkq28Ixko9Qwrz5kCMQbfUDBpKhudqsDRIRQQQyo4n
+# n3kRTdKIdS1vDPmubcK60cP9phkWpD+UiKCmEUpgHkSci2dpbRoa4R9tZKX2He0g
+# 0X7GEPPGJd3alhrtANN9yysL4cjhyt4xM4omGvFeYk3tNFJPKum3qKGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MDkxODA1MDk0NVowPwYJKoZIhvcNAQkEMTIEMPGM0MOfA3c4gZdf0P5AGwhft1xT
-# gYMTt9Q305d6SqVpqwgNLTUPdw8M6wOkQJ3V+DANBgkqhkiG9w0BAQEFAASCAgAw
-# /yaFkhk2THfQOO/EHhjqpwe+JdlRnej/dLaJJH2zUUN9LAR9dK+V1Nv2Pyz+Itux
-# TN5x5bx5dSX4+c2zlg1pJHi9mjKcf2jSZWwiqIoVghhIBl5oQOq785qHzQYpmj5u
-# /XPh5HZIY7Fq7NK/nKTyuMgng9MinjVjFa1rfCLojH5gx79H9IEhXfuGx3ILa09P
-# +S9poW/1syRBkV6+95jpKeKu3IvTj73S+CTDQY8T5+Xle5CA0a0gnHeUSzUkNT3J
-# i48a4KmT1WTzD7DT3V4fyCOYj8yNExGZvHVYpBTOZPbuPOCS8LJuh1YRGKsB4B8j
-# 5tg13nw+zunxK2KkMMRUC5yuN7EH7h9XsfzrhTAoBRaFW1hrHzRWB+E0pUCscvVB
-# I96itR7zqvEDGbI11z/aIMsIoKNx7c59VMd+t7m/Dih5gMZRhECm2+c8dmpLD8PU
-# woa/Ea3lwNYYC5SQ2bf7tlKndVZY8pyTlbpwmoX9v5PS+2WuW5GQRKkldlXmxoXu
-# Fgc7Pgz3CPt/eB3t5opvqwPPJiGJsz0wJUiPSF2Ohu9y59gU9UmJ7a8LsN4nzj7+
-# v0lkMvhnjj53BBQFjHy/jN7TVQpBkV4B/jhNAOcYCkfBXnfLhdvPHZODqOSUboxE
-# wDEOki1E06vjTxLJos53i2LmotRpiGeoZn0XJK5fvA==
+# MTAyMTA1MzEyN1owPwYJKoZIhvcNAQkEMTIEMCVos9BPWt0LPU9f+1GBQkeN25yb
+# OfdNS4UzKcRF9HeFQ6SRoPFcGKlF8xYGoIABUzANBgkqhkiG9w0BAQEFAASCAgCP
+# E2U3ahjFaqUlAWwLSBXZ3Z48FDqcgCy7kMJ2bD9Ij90UKK264jONmcBKufmabAq5
+# N9/MczwULP/lqGpjm6H8Uf8CPsHtvUi6bwrCYi5NQ9I/+3hf2W00+538ixQJ+iMS
+# Wxes/nxfrTemzm7Gr358inQfw8XOgmg+5E9y9o+8d8ibYeHpsprRj86S3TK+2qAY
+# 6mfSoEYC9H3H0w7mpSAQ3MRxXy7Ymuami7+w9AoHUWqtl0cpZ5IUyIYRJUo9ERCk
+# 6E/ofFftaNrMP6cz88hcv9YSN5OVsLMPHoaSI8mFxRL+28gm+rf/0PBtKr8AM0gF
+# okzVkxeD+yaojzJjG/z7HBH9gPDfJ3+17+gm821um1QA28e/rfIRfvJY3ggQk/Sr
+# j/ChX1pH1UyFa0h4sGaJOeyfop2C7E7UQpNVQZLOz3Lo7lMgG1wU2LMVR4/sP6TE
+# sSZ3P2vDr6uSEhPc+7ymdn8saSGMeJsjBfgMpMc67mshcAIZnnPah+j/19GDhhi3
+# 28/ZET3nnhVKRvj49MW2k3CT0Axe4QjIe52TPHMMkxMbsHNd35QbqWB8MiRxaBx9
+# ZT3vZDibCdYnFWb7fFSebP01wLjthts8UY2io+dunYHb+8KohhyELICcMFukX9RX
+# Ko0lfTlJh1qivmebPvxW8bNS7AvuD2iv+17gqjGVwg==
 # SIG # End signature block
