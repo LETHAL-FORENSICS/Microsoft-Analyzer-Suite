@@ -1,9 +1,9 @@
 ﻿<#
 .SYNOPSIS
-  Convert-UserAuthenticationMethod - Decoding the "UserAuthenticationMethod" field in Microsoft 365 Unified Audit Logs
+  ConvertFrom-UserAuthenticationMethod - Decoding the "UserAuthenticationMethod" field in Microsoft 365 Unified Audit Logs
 
 .DESCRIPTION
-  Convert-UserAuthenticationMethod.ps1 is a simple PowerShell script utilized to convert the "UserAuthenticationMethod" numeric value to a human-readable description.
+  ConvertFrom-UserAuthenticationMethod.ps1 is a simple PowerShell script utilized to convert the "UserAuthenticationMethod" numeric value to a human-readable description.
 
   Source: Unified Audit Logs (UAL) --> ExtendedProperties --> UserAuthenticationMethod
   Operations: UserLoggedIn, UserLoginFailed --> Sign-in Events
@@ -29,22 +29,22 @@
   Specifies the decimal value of the "UserAuthenticationMethod" field.
 
 .EXAMPLE
-  PS> .\Convert-UserAuthenticationMethod.ps1 -DecimalValue 1
+  PS> .\ConvertFrom-UserAuthenticationMethod.ps1 -DecimalValue 1
 
   Password in the Cloud
 
 .EXAMPLE
-  PS> .\Convert-UserAuthenticationMethod.ps1 -DecimalValue 16
+  PS> .\ConvertFrom-UserAuthenticationMethod.ps1 -DecimalValue 16
 
   Password Hash Sync
 
 .EXAMPLE
-  PS> .\Convert-UserAuthenticationMethod.ps1 -DecimalValue 272
+  PS> .\ConvertFrom-UserAuthenticationMethod.ps1 -DecimalValue 272
 
   Password Hash Sync + via Staged Rollout
 
 .EXAMPLE
-  PS> .\Convert-UserAuthenticationMethod.ps1 -DecimalValue 33554704
+  PS> .\ConvertFrom-UserAuthenticationMethod.ps1 -DecimalValue 33554704
 
   Password Hash Sync + via Staged Rollout + Passkey (FIDO2)
 
