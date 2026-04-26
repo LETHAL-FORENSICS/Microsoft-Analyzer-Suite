@@ -46,7 +46,7 @@
 .EXAMPLE
   PS> .\ConvertFrom-UserAuthenticationMethod.ps1 -DecimalValue 33554704
 
-  Password Hash Sync + via Staged Rollout + Passkey (FIDO2)
+  Password Hash Sync + via Staged Rollout + Passkey (device-bound)
 
 .NOTES
   Author - Martin Willing
@@ -76,7 +76,8 @@ Begin
         "X.509 Certificate"           = 2097152
         "MacOS Platform Credentials"  = 8388608
         "QR Code PIN"                 = 16777216
-        "Passkey (FIDO2)"             = 33554432
+        "Passkey (device-bound)"      = 33554432
+        "Passkey (synced)"            = 67108864
         "Email Verification Code"     = 134217728
     }
 }
