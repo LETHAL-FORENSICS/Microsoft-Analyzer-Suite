@@ -1,10 +1,10 @@
 ﻿# ServicePrincipal-Analyzer
 #
 # @author:    Martin Willing
-# @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
+# @copyright: Copyright (c) 2026 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-10-21
+# @date:      2026-05-01
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -26,7 +26,7 @@
 #
 #
 # Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.1
 #
 #
 #############################################################################################################################################################################################
@@ -39,7 +39,7 @@
 .DESCRIPTION
   ServicePrincipal-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of Microsoft Service Principal Sign-In Logs extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.2)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/AzureSignInLogsGraph.html
 
@@ -293,7 +293,7 @@ Write-Output ""
 
 # Header
 Write-Output "ServicePrincipal-Analyzer - Automated Processing of Microsoft Service Principal Sign-In Logs for DFIR"
-Write-Output "(c) 2025 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
+Write-Output "(c) 2026 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
 Write-Output ""
 
 # Analysis date (ISO 8601)
@@ -1166,7 +1166,7 @@ Write-Output "[Info]  Creating Hunting Stats ..."
 New-Item "$OUTPUT_FOLDER\ServicePrincipalSignInLogs\Stats" -ItemType Directory -Force | Out-Null
 
 # Data Import
-$script:Hunt      = Import-Csv "$OUTPUT_FOLDER\ServicePrincipalSignInLogs\CSV\Hunt.csv" -Delimiter "," -Encoding UTF8
+$script:Hunt      = Import-Csv -Path "$OUTPUT_FOLDER\ServicePrincipalSignInLogs\CSV\Hunt.csv" -Delimiter "," -Encoding UTF8
 $script:Untouched = Import-Csv -Path "$OUTPUT_FOLDER\ServicePrincipalSignInLogs\CSV\Untouched.csv" -Delimiter "," -Encoding UTF8
 
 # AgentType (Stats)
@@ -1174,7 +1174,7 @@ $Total = ($Untouched | Select-Object AgentType | Measure-Object).Count
 if ($Total -ge "1")
 {
     $Stats = $Untouched | Group-Object AgentType | Select-Object @{Name='AgentType'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
-    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\ServicePrincipalSignInLogs\Stats\AgentType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "NetworkNames" -CellStyleSB {
+    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\ServicePrincipalSignInLogs\Stats\AgentType.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AgentType" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
     Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
@@ -2108,8 +2108,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUBB+ik5WQCsKTEiejeMstanA3
-# GAuggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUGa6zWwMYdItBulfsorG6jjl9
+# eAeggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -2311,33 +2311,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBSbx2/Sjcz7WF5pQJa3mQqWo+fuwDANBgkqhkiG9w0B
-# AQEFAASCAgDF/9yZR50chaSdoCDEsObQ5rb9b80Xwm3JmjgKcaPK4aFnVIUjHQAi
-# Gx/NLz3z5FuB72w1qgX7d4VSGm051kQS80gAO2dOAqC731WzKI/S32RVeRk/+QFO
-# oX0W5I6s1RoHBH+XQBgQ1ra24wsP7iELTBglQe5m6blAyNLMIz/ROdljMpVt+jUa
-# OUl7ZjIkxCsxr6wDgws4ufUf7ReE0on3lgz2GokZBjVZZtjv8rVSfaFJptKOMXsq
-# lWkg77NIWtcJJNY240sZgu4QlSThltYK3adbBPRkCLZhM8WImderC8szqP6vd+06
-# SOacnCzu4uVp6ZNq+DfsFeX1PIpFmvcKT0qTMCVXWMZxGBExhOUBFnWarW7tH8iW
-# 7QtQ3wEyBlOqEoU5/1gnZYiJ/+AoRQJ4ojsG0qs5pgVL0dCGQsWfxwonoPtBKcQi
-# r/F5JfjpYswJuuEC4x2x5lqNsUBwxgvC2DN90tuJ72POewZeYnvtTStzydBn/ltz
-# X8uxuDuUoh0BPrObyKKQfKV/NfIjhPdGMTJ3uTMwrjaIfKu+qVvpMIIzN3YpXa3b
-# 79aihuRO0pMSaMAkv4GY5YAO4clc6sZ1AWxyocJS7z2s3tsHI10jfoGtiCrq1mAH
-# 7J/XJS+9llFLO/EHlUYrTX0AsTZXqRchkEydYp46HB2UfgjVx7Iy7qGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBTib7qyqdf/Xz4+Wr8r3/NBwz2h6zANBgkqhkiG9w0B
+# AQEFAASCAgA6AfaijyWq/TFOa66t46ga9/ALL3Ziv1gTyIQUqRRMES9ygFFb0ZqD
+# qKw+ZAj4YnF+RxLURqdZMaIzwxgXyjxpTvk/0FddQ6vYPMK6CKzWDVW88fsws0Ck
+# yLvrQvKOa4Re4qc+pPG4IzfxQ1ZBIFG0MDfl1PeXLvVrm+LCrl406B6iXGFpuwU0
+# 8oRjiE0yPmrVwAgzdALo9WMAjgUe/RhxeALcvO0qSkunKSVCaVYmMR0IdyZEj262
+# AUXZndkj5eYNZQlAuW5ePXaw/DhUZ3418Wg7vdrMdb7ss76GLlxfVo12rHcedo3S
+# +HTFibhcAVN+ucTD9kY4og9aDWPlyTTNByvusKJF6cFTtPVz83g8JdmC96VN2m3E
+# Fg3YFuoZ7zXaUb4UxAKZrSuw6WKrYWG4MGseEXWQug1dQ6QKWk7fBuwJ35JYy9HH
+# i0IhN9sxNjUPdyPMl4TKcg0jmWUxH9UzJRDynFFQ/ImxoK2RriW0k0Q5+AHElnSJ
+# Rh6RCEzDMwW+uKd2rtGG0u36G7K2E3SDV0yjhzwol6khXYu2Sp+S6PuPM+mh6NRr
+# yKgpUqUxNViPtiRo7K1z/0Gn0m2O2Tl1XrCZUFEuNstMJ3E6oVUgourvVZTbohFR
+# u9BXeC+9/P2p99kXfPyWXFPY6KkAGCd8raAOmMGCoRsyD7/dR22z2qGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
-# AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MTAyMTA1MzE0N1owPwYJKoZIhvcNAQkEMTIEMOBOe4HBW4n7CHNGjESyvB4lKPps
-# Z8Q6ZisF91KdYevvFPXOoJTzSpYLYgDdn/GCnzANBgkqhkiG9w0BAQEFAASCAgAr
-# zbW7KiB/Ew4Rc/ZXPcWeePc2vvsjH3T7p4TnMIqDLM1ZF0INvVLQO4syp5LTM7oz
-# VOW38DUI+6eFB/WqcWf0nzFVONwEG5PfSinS0Xo1J/1uSXZqpGQxf67qSrkHGYuo
-# MktVJYLzQdEYIdvCrePyW51oh+qPiApRl1QB4U9IIiXKKwB9LqpruNDSfCctVxsC
-# tNEU9RP/2BBDg8kDX77vwiA6gjvh/WvaV0Hmx7URa/rRsoTkS72W4782xI1KaY0n
-# xK8Urh3hXpF9kqs3K/p8XYXGu6EKYYgqLu8pg0MURJmkI2hDNYK2pg/1ozhDB0OG
-# g4x0d4r4QfHTXA9Uq6bKRy0taHYsWuYuj4KUa5ulPu2pLAmPkBRFDjg1cOlEMqNa
-# t5C9Afgluy7SwYH9T/QxhoMksNcvJtXoO9nZ8pGJU4J3fDqdGyFnInnimlYyVnzH
-# 0Oh2p4QUu9WBcodLO/tz/Y9bb7IsSg1AbE4PnmaPFc1ZRTV6C0OlydU2jRsbvX5e
-# 8rGG/0aGDR24VM6m0SFBfDByJAknpvablmsL3FLhQVe68n3Bw44y3Rat6yrySfAd
-# 2e/M3cIgPf5E3Z/3aLXH5GcEK9NULn0vNpYqhKHaxeAXTgl5BwfyfBXONGHLDntm
-# nFGeV2Y0+khUaXnTwva3s15j4dKbbWBpa6DPcb++9w==
+# AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2
+# MDUwMTEwNTAyOVowPwYJKoZIhvcNAQkEMTIEMKJYbAxnRYq5+nJMmETdR6ZuEhMG
+# qWj4YnK1ypz1k8V5Bcp3ZEJduJ0YJ1PXj3d3dTANBgkqhkiG9w0BAQEFAASCAgAV
+# 1y4B4Fqs8+VevH69pyy2rEgspksN+6RRxeKmcwi7/si2qkJ5GRXvrsQU2F3KytkR
+# rEqwu6A0L2jIs0IXjSfZRTtBegRbQoGnPE4fAgtp/Bj6Z8jOppHOj0SzFpeP58ac
+# XhJEgbqVeRgH1760uuD3y4B87MdgqPgsIKj13e9LtsJsuz9CPZ7qlOFwKeAySZu/
+# 5TJ+pFVNSh/mMwsAXcD4+IdkXxxXCMtV/1T9+tvNQGg0gS/KhfzwQlvOvyLg0pv8
+# aSFJJICHazQWjaVnKUGHhbTyt0vPlZI/dUbRatswv5o8jpd6TcoJ8+K6pfAvMTVD
+# Zl1Y6YHG8iw/lgBIDEeKWHRM6V2/xBPPr8xFWCmsP6YPJ1Ko9XVMDpsbKNC1vU4Y
+# MXXpJDS2+ZIbLwgK8JxP4IhgIKp5ajMnFrmQqsbuzkjk1LXjWCMytk/nl9JXgtdd
+# 0LcbuQFnQhff7m/5vMvW210S4Ud8z2sej9xUBt/Cu+j5+b47Q9UDeeKOJNtLH/D8
+# Cqkwj46APVY6Pk/BauvPySPibd66KdfuDgPLaf5VfOHXjfADJOASBImNtEGVBbCc
+# u0Sd+gJDM2TXB1tcUUxwDx/RymYj0AggGprk55wlqEacu/1XGz+eBuU2gXQjwltG
+# PAm3MzCusI9iV8S1xpyY2sLvyv1Zwykd6ftnnIfT3A==
 # SIG # End signature block

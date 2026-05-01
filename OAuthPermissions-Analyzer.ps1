@@ -1,10 +1,10 @@
 ﻿# OAuthPermissions-Analyzer
 #
 # @author:    Martin Willing
-# @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
+# @copyright: Copyright (c) 2026 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-10-21
+# @date:      2026-05-01
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -22,7 +22,7 @@
 #
 #
 # Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.1
 #
 #
 #############################################################################################################################################################################################
@@ -35,7 +35,7 @@
 .DESCRIPTION
   OAuthPermissions-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of M365 OAuth Permissions extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.2)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/OAuthPermissions.html#id2
 
@@ -288,7 +288,7 @@ Write-Output ""
 
 # Header
 Write-Output "OAuthPermissions-Analyzer - Automated Processing of M365 OAuth Permissions for DFIR"
-Write-Output "(c) 2025 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
+Write-Output "(c) 2026 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
 Write-Output ""
 
 # Analysis date (ISO 8601)
@@ -1296,8 +1296,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUdrJx9OyOx6k2MadrhO7Rko7e
-# 5kGggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUJExu2sYZL0w1MEFCUXr0Zw8g
+# hpOggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -1499,33 +1499,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBSHtwRCYbcVQXdc5RwC2lfcUWwLCzANBgkqhkiG9w0B
-# AQEFAASCAgA1TQELe1OtlfBVSVSrUtB1ybWMh3pAF8LTdPP/OYr4yTA9UKEOpSiC
-# Mcj+ovv/AN3NoDz/DhEj9WYRu/cIZvd2IPW/H/XJdxGqbpNu1wJuirjsU/JQ7Zhk
-# liADGD4S+Cv961hxOT7J17KYa/Yk9pW1JCOf8mXP0eBXVBpU3wGlyysZwIkPUZD9
-# N2s2M89Qj5T8TEb/6neil33Wu7/nR55VFPECGUzike2JTBXydZSElieIc904M4jg
-# c7j9WOYMje1auBz96a9DOdrhKO91JYVo/F4Ku+KUWGsxhm8tFysI4as74+YYcK5Z
-# m3+gO2qIh687F7O/JuUvNHyWn259uSyRjWECm72pGyr4Qt9N+YIMCnjutI3QcqXf
-# nT8/ufhpT4CvviVhHs45xKGkAkMFC1VGhJ022bMPtqn8hTOrlpFA/eZmEvPhl+Zd
-# 2zaygQGwgvjQuqdh5L+8VAReypqx8CVGk60VJFLK6k3Pv/el1hXNbRZuQr0v/r0S
-# nWpJRbV8zf3LrTNnVAIBJUga9NleyXiw/5ZCWZAADK4FA9oLumjF+NZc8piwCbCw
-# 121YOj6OXPmRiEGFwQ8+mNhWhPaznm9+Dv3nPQleNwfJC+ej7N3xll/78epPu6Wj
-# gTKzInOQMfFcxNRrBVmzQDylPteypgS5Vxu5ZK+SqP5sTg6jSw7A/6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQQf3kIODyS136ye4hLOTMNAN66oDANBgkqhkiG9w0B
+# AQEFAASCAgClvIskjCGgVzORLNeaiS/DMArRZKb9mXTaIjpxr73BlZG0k+z5UzxX
+# Pxiq6w3TGJ9UTfqQPDDUjo09j3AXwHFJDcRj488wQP1wwUj0t3bHZ6Ke6MUjxyLj
+# oj3xew9YMN+zM3eawOSPJZ/4uzg1c4MqAo9zKd+iUqYfaxsYRJ1doS94y7209UYG
+# 3GJZi6Opru9/GJOeRBf/NTO7TW0N8fPCZfSbNGVAGHvG+oNkTFrFrMo/KAVSC/Hj
+# X6MISNib/LCHs6yO13+3U2AT/d1eGWw4y5d6kfn4x0L+80sQGJLfemOmPmb0mL2p
+# /0/OXRa311WSdkgujWscIv57llRxpqi24/cFMA//1/cJLIWDXXdTrzfNGbDUpQxf
+# 6pwsb1q69gTx/HlosJeoEKIjlXbLgjtt4d8CpjmjymsjaWbsoa/6K1JKHYGltems
+# 4Wu0G4h9TniLv8WOZvBJlyJSer3kKuWx7aMCk2T63857g7RTydH1aAs8z28XD1bt
+# ClOIUXYRu31eWkTj9EpVFVczFmd2Lxs4CZ3XahDp2hU21ASaUBmX2dZkdBMees0M
+# a/Sc4+S7O3eeU3N1e3gQiU5ZmaTY4cFqzA34/OPE7kJDCQkPaRalkJYqLNN6j8c0
+# y8gK2j74r4JUn4YMIsbFTH9k8X5iveRtZQo1s6yWwYnTDf9QMEyRWqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
-# AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MTAyMTA1MzEzOFowPwYJKoZIhvcNAQkEMTIEMNFAcXtMtHGA7i1DJpGiBVVz4SeM
-# giU3Nyk30mdvBhybzKqpaQBsbo5B3Rd9EI0ArDANBgkqhkiG9w0BAQEFAASCAgC1
-# uRCJqQesQzDvngzV8wv/gP6Yxc3DvZyS9wKKoWfeg99jdabNEoJwfxuSzrdQVMRf
-# xd3R2z3n9R9PqYydjX1rVbdFS6oPc3L4XgHSutyHusHL8/AP8q6uD8XujTo1fsF5
-# EANqI8XCF3mt/hvl8VsAa3BLcJLtuT2XHrTy4hbjXJ8SxiWjC8oS4LJandYpEY9j
-# D2k0YKtr1mjflx9+GF9nvL95kjUnO036bsP7KEg8NfXV/ZvG/KeCz55gieeBWxti
-# Wg9vZ4e6QY7tkNTaI7rdKG/OF73iwppYZs5eu4+7RviidvJ9IsKazCMy2C2Msm31
-# y/p1Qgk3yaYEOFsRT3ILdv9zGxOVcBESLzH+ufV/XW0ITx4+9AL0r3+ACxMadAmY
-# 93AkBQoLA1Lt+0RE+qVEIV2At2h8g+cJXUWVrRPTLcoC96uxX1QyK8SXdAQZrvrq
-# nd3JnGEXWkPvmzSG0+rQ+zamPWpE1cXHlnggyUJYmhQaJdVEPBSMqWj2+TtufvlY
-# RewdTZ6ozbl4A7uj1ohKcgklWoRMzWdflvDY+sWIvp7ecwd9pHKxvcXbBl5npxvf
-# hrVADrPXPzAQWIOdLsZir3RzzUXg6xvoX3qQyjL0Ogkp4gHr27HtWKB7CV4p51bh
-# SgFho095SZt6QjVYODJXaBhSa1YLl40fam1hSE0PUw==
+# AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2
+# MDUwMTEwNTAyMFowPwYJKoZIhvcNAQkEMTIEMAJfVxEUXDcWPOiZOBfz7qkzQMIU
+# TkqS0U10HAR2ScRUpLs8GUh2E6OHu8W6NNjppTANBgkqhkiG9w0BAQEFAASCAgCK
+# YgKJgzecS4Q5O1mo7ls12K1cu3S/m9TllsSLHXsOjcUHT6dRXbEvfHsyB4m54OKn
+# tX/P7V1Tz8buaHLkF74SuLTImIWnQIHlxPkALMqRdr5M763pOOLH1eqBTDuASGpC
+# xz9j/90mnArWjc4MpTQzCwm1ExhpcJ7a7DB21O8NGeIil3phKb5wt7WydgHglc1J
+# GEg48Go6ILtxQzUN4ODN/c/nlSyrlO1oiPgaxK1Ff6EqLD5TQ0hSrdF9fPfyY0xo
+# hXwAnOhnEIU2yG0gHVRkP4RGAwNAbUcSx5n/FxUUx1FKyP4Ctl3NlEZPAIWmN/qL
+# pSxXH/qcF1Kc64THTabzuRgqvOZKjqVFyQ1QstnPodyY/sks1joYIEpiR93E9MWX
+# eZQZrEfM8TpSxUgdfuRZBEw6q0gIc7qC/DDVs24U4K4jChGVu1WSkmIpl8hkhyB+
+# EcHnz9f1DTvqEOT4MheChdc73Tw3kn4ihMxbQp3VnWyz2ooGECgVcmHBZ5rjY7sh
+# AQIQYbVkyPpidcQ8FNn4LWIALwWpT2nNzkwZutZeGBrYQZBfk/oqCaEIPxFvw/in
+# Qu/CgYHrVk/szq2yNO6VOIYnXBzRortVKnEBuufbnxXnNRGm3SRnu4ETuTzjl6fo
+# DQ6Wm/+aSKasq/uXVqDi9erK/6NJBBy0JJNQLxpzWw==
 # SIG # End signature block

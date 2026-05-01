@@ -1,10 +1,10 @@
 ﻿# UAL-Analyzer
 #
 # @author:    Martin Willing
-# @copyright: Copyright (c) 2025 Martin Willing. All rights reserved. Licensed under the MIT license.
+# @copyright: Copyright (c) 2026 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2025-10-21
+# @date:      2026-05-01
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -26,7 +26,7 @@
 #
 #
 # Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.5.3
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.1
 #
 #
 #############################################################################################################################################################################################
@@ -39,11 +39,20 @@
 .DESCRIPTION
   UAL-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of M365 Unified Audit Logs extracted via "Microsoft Extractor Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.0)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.2)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/M365/UnifiedAuditLog.html
 
   Single User Audit
+
+  Alternative Acquisition Method:
+
+  $LastDays  = "90" # Adjust if needed
+  $Today     = (Get-Date).ToUniversalTime()
+  $LastDay   = $Today.AddDays(-$LastDays) 
+  $StartDate = ($LastDay).ToString("yyyy-MM-ddTHH:mm:ssK")
+  $EndDate   = ($Today).ToString("yyyy-MM-ddTHH:mm:ssK")
+  Search-UnifiedAuditLog -StartDate $StartDate -EndDate $EndDate -UserIds "test@lethal-forensics.com" -SessionCommand ReturnLargeSet -ResultSize 5000 | Export-Csv -Path "$env:USERPROFILE\Desktop\UAL.csv" -NoTypeInformation
 
 .PARAMETER OutputDir
   Specifies the output directory. Default is "$env:USERPROFILE\Desktop\UAL-Analyzer".
@@ -305,7 +314,7 @@ Write-Output ""
 
 # Header
 Write-Output "UAL-Analyzer - Automated Processing of M365 Unified Audit Logs for DFIR"
-Write-Output "(c) 2025 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
+Write-Output "(c) 2026 Martin Willing at Lethal-Forensics (https://lethal-forensics.com/)"
 Write-Output ""
 
 # Analysis date (ISO 8601)
@@ -624,27 +633,6 @@ if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\Custom.csv")
     }
 }
 
-# XLSX
-if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\SessionCookieTheft.csv")
-{
-    if(Test-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\SessionCookieTheft.csv" -MaxLines 2)
-    {
-        $IMPORT = Import-Csv "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\SessionCookieTheft.csv" -Delimiter "," | Sort-Object @{Expression={ $_."ClientIP" -as [Int] }} -Descending
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\XLSX\SessionCookieTheft.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "SessionCookieTheft" -CellStyleSB {
-        param($WorkSheet)
-        # BackgroundColor and FontColor for specific cells of TopRow
-        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-        # HorizontalAlignment "Center" of column A-D
-        $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
-        # ConditionalFormatting - Different IP addresses (and User-Agents) indicate Session Cookie Theft
-        $LastRow = $WorkSheet.Dimension.End.Row
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["B2:B$LastRow"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue '=$B2>=2' -BackgroundColor Red # ClientIP
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["C2:C$LastRow"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue '=$C2>=2' -BackgroundColor Red # OS
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["D2:D$LastRow"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue '=$D2>=2' -BackgroundColor Red # BrowserType
-        }
-    }
-}
-
 # Stats
 New-Item "$OUTPUT_FOLDER\UnifiedAuditLogs\Stats" -ItemType Directory -Force | Out-Null
 
@@ -760,12 +748,16 @@ if ($Total -ge "1")
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Set-MailboxJunkEmailConfiguration",$A1)))' -BackgroundColor Red # Bypass spam filters and successfully deliver spoofed messages to a targeted user’s mailbox
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SoftDelete",$A1)))' -BackgroundColor Red # Deleted messages from Deleted Items folder
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("HygieneTenantEvents",$A1)))' -BackgroundColor Red # Hygiene events are related to outbound spam protection. These events are related to users who are restricted from sending email.
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("AtpDetection",$A1)))' -BackgroundColor Red # Threat Detection Event by Microsoft Defender for Office 365
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SearchQueryInitiatedExchange",$A1)))' -BackgroundColor Red # It is logged when a user submits a search query in Exchange Online (Outlook Desktop Client, OWA, Outlook for iOS and Android, Mail app for Windows 10).
     # ConditionalFormatting - SharePoint Auditing
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("AddedToSecureLink",$A1)))' -BackgroundColor Red # A user was added to the list of entities who can use a secure sharing link. A link that only works for specific people was secured to a user.
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SearchQueryPerformed",$A1)))' -BackgroundColor Red # A user performed a search in SharePoint or OneDrive for Business. 
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SecureLinkCreated",$A1)))' -BackgroundColor Red # A secure sharing link was created to this item. A link that only works for specific people was created. It's usually followed by a series of AddedToSecureLink operations, which signify the users who were secured to the link.
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SecureLinkUpdated",$A1)))' -BackgroundColor Red # A secure sharing link was updated. A link that only works for specific people was updated.
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SharingInvitationCreated",$A1)))' -BackgroundColor Red # A user shared a resource in SharePoint Online or OneDrive for Business with a user who isn't in your organization's directory.
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("FileSyncDownloadedFull",$A1)))' -BackgroundColor Red # A user downloaded a file to their computer from a SharePoint document library or OneDrive using OneDrive sync app (OneDrive.exe) --> SharePoint Synchronization for Offline Usage / Data Exfiltration
+    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SearchQueryInitiatedSharePoint",$A1)))' -BackgroundColor Red # It is logged when a user submits a search query in SharePoint Online --> document-level reconnaissance
     # ConditionalFormatting - Account Manipulation
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Add user.",$A1)))' -BackgroundColor Red # A user account was created
     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Added member to group",$A1)))' -BackgroundColor Red # A member was added to a group
@@ -4269,7 +4261,10 @@ if (Test-Path "$($IPinfo)")
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue '$D1="Set-Mailbox"' -BackgroundColor Red # BEC
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue '$D1="UpdateInboxRules"' -BackgroundColor Red # BEC
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Set-MailboxJunkEmailConfiguration",$D1)))' -BackgroundColor Red # BEC
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SearchQueryInitiatedExchange",$D1)))' -BackgroundColor Red # BEC
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SearchQueryInitiatedSharePoint",$D1)))' -BackgroundColor Red # BEC
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("HygieneTenantEvents",$D1)))' -BackgroundColor Red # Outbound Spam
+                                    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("AtpDetection",$D1)))' -BackgroundColor Red # Threat Detection Event by Microsoft Defender for Office 365
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SearchStarted",$D1)))' -BackgroundColor Red # Content Search Abuse
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SearchExportDownloaded",$D1)))' -BackgroundColor Red # Content Search Abuse
                                     Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("ViewedSearchExported",$D1)))' -BackgroundColor Red # Content Search Abuse
@@ -5777,7 +5772,7 @@ if (Test-Path "$($IPinfo)")
                         {
                             if(Test-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\Hunt.csv" -MaxLines 2)
                             {
-                                # Suspicious SharePointSharingOperations
+                                # Suspicious SharePoint Sharing Operations
 
                                 # LETHAL-052: Suspicious SharePoint Action(s) detected: A user in your organization tried to share 10+ resources (likely a site) with an external user on a single day.
                                 # RecordType: SharePointSharingOperation --> SharePoint sharing events.
@@ -6063,7 +6058,7 @@ if (Test-Path "$($IPinfo)")
                                     }
                                 }
 
-                                # Suspicious SharePointFileOperations
+                                # Suspicious SharePoint File Operations
 
                                 # LETHAL-057: Suspicious SharePoint Action(s) detected: A user in your organization possibly uploaded a suspicious document on a site
                                 # RecordType: SharePointFileOperation --> SharePoint file operation events.
@@ -6216,6 +6211,60 @@ if (Test-Path "$($IPinfo)")
                                     }
                                 }
 
+                                # LETHAL-xxx: SharePoint Synchronization for Offline Usage / Potential Data Exfiltration
+                                # RecordType: SharePointFileOperation --> SharePoint file operation events.
+                                # Operation: FileSyncDownloadedFull --> A user downloaded a file to their computer from a SharePoint document library.
+                                $Import = Import-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV\Hunt.csv" -Delimiter "," -Encoding UTF8 | Where-Object { $_.RecordType -eq "SharePointFileOperation" } | Where-Object { $_.Operation -eq "FileSyncDownloadedFull" } | Sort-Object { $_.CreationTime -as [datetime] } -Descending
+                                $Count = ($Import | Measure-Object).Count
+
+                                if ($Count -gt 0)
+                                {
+                                    Write-Host "[Alert] Suspicious SharePoint Action(s) detected: A user downloaded a file to his computer from a SharePoint document library ($Count)" -ForegroundColor Yellow
+                                    New-Item "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-SharePoint-Actions\CSV" -ItemType Directory -Force | Out-Null
+                                    New-Item "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-SharePoint-Actions\XLSX" -ItemType Directory -Force | Out-Null
+
+                                    # CSV
+                                    $Import | Export-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-SharePoint-Actions\CSV\SharePointFileOperation-FileSyncDownloadedFull.csv" -NoTypeInformation -Encoding UTF8
+
+                                    # XLSX
+                                    if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-SharePoint-Actions\CSV\SharePointFileOperation-FileSyncDownloadedFull.csv")
+                                    {
+                                        if(Test-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-SharePoint-Actions\CSV\SharePointFileOperation-FileSyncDownloadedFull.csv" -MaxLines 2)
+                                        {
+                                            $IMPORT = Import-Csv "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-SharePoint-Actions\CSV\SharePointFileOperation-FileSyncDownloadedFull.csv" -Delimiter "," | Select-Object CreationTime,UserId,RecordType,Operation,ObjectId,ClientIP,UserAgent,City,Region,Country,"Country Name",ASN,OrgName,Timezone,Workload,UniqueTokenId
+                                            $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Suspicious-SharePoint-Actions\XLSX\SharePointFileOperation-FileSyncDownloadedFull.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "FileSyncDownloadedFull" -CellStyleSB {
+                                            param($WorkSheet)
+                                            # BackgroundColor and FontColor for specific cells of TopRow
+                                            Set-Format -Address $WorkSheet.Cells["A1:P1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+                                            # HorizontalAlignment "Center" of columns A-D and F-P
+                                            $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
+                                            $WorkSheet.Cells["F:P"].Style.HorizontalAlignment="Center"
+                                            # ConditionalFormatting - RecordType
+                                            Add-ConditionalFormatting -Address $WorkSheet.Cells["C:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("SharePointFileOperation",$C1)))' -BackgroundColor Yellow
+                                            # ConditionalFormatting - Operation
+                                            Add-ConditionalFormatting -Address $WorkSheet.Cells["D:D"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("FileSyncDownloadedFull",$D1)))' -BackgroundColor Yellow
+                                            # ConditionalFormatting - UserAgent
+                                            Add-ConditionalFormatting -Address $WorkSheet.Cells["G:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Microsoft SkyDriveSync",$G1)))' -BackgroundColor Yellow # SkyDriveSync User-Agent
+                                            
+                                            # Iterating over the Country-Blacklist HashTable
+                                            foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+                                            {
+                                                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$K1)))' -f $Country
+                                                Add-ConditionalFormatting -Address $WorkSheet.Cells["K:K"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                                            }
+
+                                            # Iterating over the ASN-Blacklist HashTable
+                                            foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+                                            {
+                                                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$L1)))' -f $ASN
+                                                Add-ConditionalFormatting -Address $WorkSheet.Cells["L:L"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                                            }
+
+                                            }
+                                        }
+                                    }
+                                }
+
                                 # Line Charts
 
                                 # Import Data
@@ -6287,7 +6336,7 @@ $StartTime_Analytics = (Get-Date)
 $UserLoggedInRecords = Import-Csv -Path "$LogFile" -Delimiter "," -Encoding UTF8 | Where-Object { $_.RecordType -eq "AzureActiveDirectoryStsLogon" } | Where-Object { $_.Operations -eq "UserLoggedIn" }
 
 # AuditData
-$AuditData = $UserLoggedInRecords | Select-Object -ExpandProperty AuditData | ConvertFrom-Json | Sort-Object { $_.CreationTime -as [datetime] } -Descending
+$AuditData = $UserLoggedInRecords | Sort-Object Identity -Unique | Select-Object -ExpandProperty AuditData | ConvertFrom-Json | Sort-Object { $_.CreationTime -as [datetime] } -Descending
 
 New-Item "$OUTPUT_FOLDER\UnifiedAuditLogs\CSV" -ItemType Directory -Force | Out-Null
 New-Item "$OUTPUT_FOLDER\UnifiedAuditLogs\XLSX" -ItemType Directory -Force | Out-Null
@@ -6397,6 +6446,17 @@ if ($PrivacyDetection -eq "False")
             $IsCompliantAndManaged = "True"
         }
 
+        # UserAuthenticationMethod (incl. Bitfield Mapping)
+        $DecimalValue = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAuthenticationMethod'}).Value
+        if ($DecimalValue)
+        {
+            $UserAuthenticationMethod = ConvertFrom-UserAuthenticationMethod -DecimalValue $DecimalValue
+        }
+        else
+        {
+            $UserAuthenticationMethod = ""
+        }
+
         $Line = [PSCustomObject]@{
             CreationTime       = $AuditData | Select-Object -ExpandProperty CreationTime | ForEach-Object {$_ -replace 'T',' '} # The date and time in Coordinated Universal Time (UTC) when the audit log record was generated.
             Id                 = $AuditData.Id # Unique identifier of an audit record.
@@ -6415,9 +6475,11 @@ if ($PrivacyDetection -eq "False")
             #AzureActiveDirectoryEventType = $AuditData.AzureActiveDirectoryEventType
 
             # ExtendedProperties --> The extended properties of the Microsoft Entra event.
-            UserAgent          = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
-            RequestType        = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
-            ResultStatusDetail = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            UserAgent                = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
+            RequestType              = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
+            ResultStatusDetail       = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            DecimalValue             = $DecimalValue
+            UserAuthenticationMethod = $UserAuthenticationMethod
 
             # IP Data Enrichment
             "City"                  = $City
@@ -6480,9 +6542,9 @@ if ($PrivacyDetection -eq "False")
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\XLSX\UserLoggedIn.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,4 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserLoggedIn" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            Set-Format -Address $WorkSheet.Cells["A1:AF1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-            # HorizontalAlignment "Center" of columns A-AF
-            $WorkSheet.Cells["A:AF"].Style.HorizontalAlignment="Center"
+            Set-Format -Address $WorkSheet.Cells["A1:AH1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AH
+            $WorkSheet.Cells["A:AH"].Style.HorizontalAlignment="Center"
 
             # Iterating over the Application-Blacklist HashTable - ObjectId
             foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
@@ -6496,8 +6558,8 @@ if ($PrivacyDetection -eq "False")
             foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
             {
                 $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
-                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$R1)))' -f $AppId
-                Add-ConditionalFormatting -Address $WorkSheet.Cells["R:R"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$S1)))' -f $AppId
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["S:S"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
             }
 
             # Iterating over the Application-Blacklist HashTable - ApplicationId
@@ -6516,18 +6578,18 @@ if ($PrivacyDetection -eq "False")
             # Iterating over the ASN-Blacklist HashTable
             foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
             {
-                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$P1)))' -f $ASN
-                Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$Q1)))' -f $ASN
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["Q:Q"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
 
-                $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$P1))),$AA1<>"")' -f $ASN
-                Add-ConditionalFormatting -Address $WorkSheet.Cells["AA:AA"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
+                $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$Q1))),$AB1<>"")' -f $ASN
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["AB:AB"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
             }
 
             # Iterating over the Country-Blacklist HashTable
             foreach ($Country in $CountryBlacklist_HashTable.Keys) 
             {
-                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$O1)))' -f $Country
-                Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+                $ConditionValue = 'NOT(ISERROR(FIND("{0}",$P1)))' -f $Country
+                Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
             }
 
             # ConditionalFormatting - ObjectId
@@ -6545,7 +6607,7 @@ if ($PrivacyDetection -eq "False")
             }
 
             # ConditionalFormatting - BrowserType
-            Add-ConditionalFormatting -Address $WorkSheet.Cells["V:V"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$V1)))' -BackgroundColor Red
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["X:X"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$X1)))' -BackgroundColor Red
             }
         }
     }
@@ -6675,6 +6737,17 @@ if ($PrivacyDetection -eq "True")
             $IsCompliantAndManaged = "True"
         }
 
+        # UserAuthenticationMethod (incl. Bitfield Mapping)
+        $DecimalValue = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAuthenticationMethod'}).Value
+        if ($DecimalValue)
+        {
+            $UserAuthenticationMethod = ConvertFrom-UserAuthenticationMethod -DecimalValue $DecimalValue
+        }
+        else
+        {
+            $UserAuthenticationMethod = ""
+        }
+
         $Line = [PSCustomObject]@{
             CreationTime       = $AuditData | Select-Object -ExpandProperty CreationTime | ForEach-Object {$_ -replace 'T',' '} # The date and time in Coordinated Universal Time (UTC) when the audit log record was generated.
             Id                 = $AuditData.Id # Unique identifier of an audit record.
@@ -6693,9 +6766,11 @@ if ($PrivacyDetection -eq "True")
             #AzureActiveDirectoryEventType = $AuditData.AzureActiveDirectoryEventType
 
             # ExtendedProperties --> The extended properties of the Microsoft Entra event.
-            UserAgent          = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
-            RequestType        = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
-            ResultStatusDetail = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            UserAgent                = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
+            RequestType              = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
+            ResultStatusDetail       = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            DecimalValue             = $DecimalValue
+            UserAuthenticationMethod = $UserAuthenticationMethod
 
             # IP Data Enrichment
             "City"        = $City
@@ -6767,9 +6842,9 @@ if ($PrivacyDetection -eq "True")
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\XLSX\UserLoggedIn.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,4 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserLoggedIn" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            Set-Format -Address $WorkSheet.Cells["A1:AM1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-            # HorizontalAlignment "Center" of columns A-AM
-            $WorkSheet.Cells["A:AM"].Style.HorizontalAlignment="Center"
+            Set-Format -Address $WorkSheet.Cells["A1:AO1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AO
+            $WorkSheet.Cells["A:AO"].Style.HorizontalAlignment="Center"
 
             # Iterating over the Application-Blacklist HashTable - ObjectId
             foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
@@ -6945,6 +7020,17 @@ if ($PrivacyDetection -eq "False")
             $IsCompliantAndManaged = "True"
         }
 
+        # UserAuthenticationMethod (incl. Bitfield Mapping)
+        $DecimalValue = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAuthenticationMethod'}).Value
+        if ($DecimalValue)
+        {
+            $UserAuthenticationMethod = ConvertFrom-UserAuthenticationMethod -DecimalValue $DecimalValue
+        }
+        else
+        {
+            $UserAuthenticationMethod = ""
+        }
+
         $Line = [PSCustomObject]@{
             CreationTime       = $AuditData | Select-Object -ExpandProperty CreationTime | ForEach-Object {$_ -replace 'T',' '} # The date and time in Coordinated Universal Time (UTC) when the audit log record was generated.
             Id                 = $AuditData.Id # Unique identifier of an audit record.
@@ -6963,9 +7049,11 @@ if ($PrivacyDetection -eq "False")
             #AzureActiveDirectoryEventType = $AuditData.AzureActiveDirectoryEventType
 
             # ExtendedProperties --> The extended properties of the Microsoft Entra event.
-            UserAgent          = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
-            RequestType        = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
-            ResultStatusDetail = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            UserAgent                = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
+            RequestType              = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
+            ResultStatusDetail       = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            DecimalValue             = $DecimalValue
+            UserAuthenticationMethod = $UserAuthenticationMethod
 
             # IP Data Enrichment
             "City"                  = $City
@@ -7025,9 +7113,9 @@ if ($PrivacyDetection -eq "False")
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\XLSX\UserLoginFailed.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,4 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserLoginFailed" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            Set-Format -Address $WorkSheet.Cells["A1:AE1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-            # HorizontalAlignment "Center" of columns A-AE
-            $WorkSheet.Cells["A:AE"].Style.HorizontalAlignment="Center"
+            Set-Format -Address $WorkSheet.Cells["A1:AG1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AG
+            $WorkSheet.Cells["A:AG"].Style.HorizontalAlignment="Center"
 
             # Iterating over the Application-Blacklist HashTable - ObjectId
             foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
@@ -7203,6 +7291,17 @@ if ($PrivacyDetection -eq "True")
             $IsCompliantAndManaged = "True"
         }
 
+        # UserAuthenticationMethod (incl. Bitfield Mapping)
+        $DecimalValue = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAuthenticationMethod'}).Value
+        if ($DecimalValue)
+        {
+            $UserAuthenticationMethod = ConvertFrom-UserAuthenticationMethod -DecimalValue $DecimalValue
+        }
+        else
+        {
+            $UserAuthenticationMethod = ""
+        }
+
         $Line = [PSCustomObject]@{
             CreationTime       = $AuditData | Select-Object -ExpandProperty CreationTime | ForEach-Object {$_ -replace 'T',' '} # The date and time in Coordinated Universal Time (UTC) when the audit log record was generated.
             Id                 = $AuditData.Id # Unique identifier of an audit record.
@@ -7221,9 +7320,11 @@ if ($PrivacyDetection -eq "True")
             #AzureActiveDirectoryEventType = $AuditData.AzureActiveDirectoryEventType
 
             # ExtendedProperties --> The extended properties of the Microsoft Entra event.
-            UserAgent          = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
-            RequestType        = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
-            ResultStatusDetail = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            UserAgent                = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'UserAgent'}).Value # Information about the user's browser. This information is provided by the browser.
+            RequestType              = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'RequestType'}).Value
+            ResultStatusDetail       = ($AuditData | Select-Object -ExpandProperty ExtendedProperties | Where-Object {$_.Name -eq 'ResultStatusDetail'}).Value
+            DecimalValue             = $DecimalValue
+            UserAuthenticationMethod = $UserAuthenticationMethod
 
             # IP Data Enrichment
             "City"        = $City
@@ -7292,9 +7393,9 @@ if ($PrivacyDetection -eq "True")
             $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\XLSX\UserLoginFailed.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,4 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserLoginFailed" -CellStyleSB {
             param($WorkSheet)
             # BackgroundColor and FontColor for specific cells of TopRow
-            Set-Format -Address $WorkSheet.Cells["A1:AN1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-            # HorizontalAlignment "Center" of columns A-AN
-            $WorkSheet.Cells["A:AN"].Style.HorizontalAlignment="Center"
+            Set-Format -Address $WorkSheet.Cells["A1:AP1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AP
+            $WorkSheet.Cells["A:AP"].Style.HorizontalAlignment="Center"
 
             # Iterating over the Application-Blacklist HashTable - ObjectId
             foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
@@ -7898,6 +7999,7 @@ if ($Count -gt 0)
     {
         $AuditData = ConvertFrom-Json $Record.AuditData
         $AppAccessContext = $AuditData.AppAccessContext
+        $Item = $AuditData.Item
 
         # UserType
         [int]$UserTypeValue = $AuditData.UserType
@@ -7911,19 +8013,17 @@ if ($Count -gt 0)
         $Line = [PSCustomObject]@{
             CreationTime      = ($AuditData | Select-Object @{Name="CreationTime";Expression={([DateTime]::Parse($_.CreationTime).ToString("yyyy-MM-dd HH:mm:ss"))}}).CreationTime
             Id                = $AuditData.Id
-            Operation         = $AuditData.Operation
-            OrganizationId    = $AuditData.OrganizationId
+            Workload          = $AuditData.Workload         
             RecordType        = $Record.RecordType
+            Operation         = $AuditData.Operation
             ResultStatus      = $AuditData.ResultStatus
-            UserKey           = $AuditData.UserKey
-            UserType          = $UserType
-            Version           = $AuditData.Version
-            Workload          = $AuditData.Workload
             UserId            = $AuditData.UserId
+            UserType          = $UserType
             AppId             = $AuditData.AppId
             ClientAppId       = $AuditData.ClientAppId
             ClientIPAddress   = $AuditData.ClientIPAddress
             ClientInfoString  = $AuditData.ClientInfoString
+            ClientProcessName = $AuditData.ClientProcessName
             ActorInfoString   = $AuditData.ActorInfoString
             ExternalAccess    = $AuditData.ExternalAccess
             InternalLogonType = $AuditData.InternalLogonType
@@ -7937,9 +8037,9 @@ if ($Count -gt 0)
             MailAccessType    = ($AuditData | Select-Object -ExpandProperty OperationProperties -ErrorAction SilentlyContinue | Where-Object {$_.Name -eq 'MailAccessType'}).Value
             IsThrottled       = ($AuditData | Select-Object -ExpandProperty OperationProperties -ErrorAction SilentlyContinue | Where-Object {$_.Name -eq 'IsThrottled'} | Select-Object Value -Unique).Value
 
+            OrganizationId    = $AuditData.OrganizationId
             OrganizationName  = $AuditData.OrganizationName
             OriginatingServer = $AuditData.OriginatingServer
-            SessionId         = $AuditData.SessionId
 
             # Folders --> FolderItems
             ClientRequestId   = ($AuditData | Select-Object -ExpandProperty Folders -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FolderItems -ErrorAction SilentlyContinue | Select-Object ClientRequestId -Unique).ClientRequestId -join "`r`n"
@@ -7950,7 +8050,12 @@ if ($Count -gt 0)
             FolderId          = ($AuditData | Select-Object -ExpandProperty Folders -ErrorAction SilentlyContinue | Select-Object Id).Id -join "`r`n"
             Folder            = ($AuditData | Select-Object -ExpandProperty Folders -ErrorAction SilentlyContinue | Select-Object Path).Path -join "`r`n" # Folder & Mailbox
 
+            # Item --> ParentFolder
+            ParentFolderId    = ($Item | Select-Object -ExpandProperty ParentFolder -ErrorAction SilentlyContinue | Select-Object Id).Id -join "`r`n"
+            ParentFolderName  = ($Item | Select-Object -ExpandProperty ParentFolder -ErrorAction SilentlyContinue | Select-Object Name).Name -join "`r`n"
+
             OperationCount    = $AuditData.OperationCount # Aggregated Events
+            SessionId         = $AuditData.SessionId
 
             # AppAccessContext
             "IssuedAtTime"    = $AppAccessContext.IssuedAtTime | ForEach-Object {$_ -replace 'T',' '} # Indicates when the authentication for this Microsoft Entra token occurred.
@@ -7966,17 +8071,17 @@ if ($Count -gt 0)
     if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\MailItemsAccessed.csv")
     {
         $IMPORT = Import-Csv "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\MailItemsAccessed.csv" -Delimiter "," -Encoding UTF8
-        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\XLSX\MailItemsAccessed.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MailItemsAccessed" -CellStyleSB {
+        $IMPORT | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\XLSX\MailItemsAccessed.xlsx" -NoNumberConversion * -FreezePane 2,6 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MailItemsAccessed" -CellStyleSB {
         param($WorkSheet)
         # BackgroundColor and FontColor for specific cells of TopRow
-        Set-Format -Address $WorkSheet.Cells["A1:AJ1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-        # HorizontalAlignment "Center" of columns A-AC and AF-AJ
+        Set-Format -Address $WorkSheet.Cells["A1:AK1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns A-AC and AF-AK
         $WorkSheet.Cells["A:AC"].Style.HorizontalAlignment="Center"
-        $WorkSheet.Cells["AF:AJ"].Style.HorizontalAlignment="Center"
+        $WorkSheet.Cells["AF:AK"].Style.HorizontalAlignment="Center"
         # HorizontalAlignment "Right" of column AE (Multi-Line)
-        $WorkSheet.Cells["AE:AE"].Style.HorizontalAlignment="Right"
+        $WorkSheet.Cells["AD:AD"].Style.HorizontalAlignment="Right"
         # HorizontalAlignment "Center" of header of column AE (Multi-Line)
-        $WorkSheet.Cells["AE1:AE1"].Style.HorizontalAlignment="Center"
+        $WorkSheet.Cells["AD1:AD1"].Style.HorizontalAlignment="Center"
         }
     }
 
@@ -8427,19 +8532,26 @@ if ($Count -gt 0)
             # https://github.com/merill/microsoft-info
             [string]$GUID = $Record.AppId
 
-            if($MicrosoftApps_HashTable.ContainsKey("$GUID"))
+            if ($GUID)
             {
-                $AppDisplayName = $MicrosoftApps_HashTable["$GUID"]
+                if($MicrosoftApps_HashTable.ContainsKey("$GUID"))
+                {
+                    $AppDisplayName = $MicrosoftApps_HashTable["$GUID"]
+                }
+                else
+                {
+                    $AppDisplayName = "Third-Party Application"
+                }
+
+                # Check if 'Application-Blacklist.csv' contains AppId
+                if($ApplicationBlacklist_HashTable.Contains("$GUID"))
+                {
+                    $AppDisplayName = $ApplicationBlacklist_HashTable["$GUID"][0]
+                }
             }
             else
             {
-                $AppDisplayName = "Third-Party Application"
-            }
-
-            # Check if 'Application-Blacklist.csv' contains AppId
-            if($ApplicationBlacklist_HashTable.Contains("$GUID"))
-            {
-                $AppDisplayName = $ApplicationBlacklist_HashTable["$GUID"][0]
+                $AppDisplayName = ""
             }
 
             $Line = [PSCustomObject]@{
@@ -8486,6 +8598,9 @@ if ($Count -gt 0)
             # HorizontalAlignment "Center" of columns A-S and U-Y
             $WorkSheet.Cells["A:S"].Style.HorizontalAlignment="Center"
             $WorkSheet.Cells["U:Y"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - MailAccessType
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["E:E"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Sync",$E1)))' -BackgroundColor Yellow # Potential Mailbox Synchronisation for Offline Usage / Exfiltration via Sync Access
                     
             # ConditionalFormatting - AppDisplayName
             Add-ConditionalFormatting -Address $WorkSheet.Cells["I:I"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third-Party Application",$I1)))' -BackgroundColor Yellow
@@ -8696,11 +8811,27 @@ if ($Count -gt 0)
             if(Test-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\Hunt.csv" -MaxLines 2)
             {
                 $Import = Import-Csv -Path "$LogFile" -Delimiter "," | Where-Object { $_.IsThrottled -eq "True" } | Sort-Object { $_.CreationTime -as [datetime] } -Descending
-                $Count = [string]::Format('{0:N0}',($Import | Measure-Object).Count)
+                $Count = ($Import | Measure-Object).Count
 
                 if ($Count -gt 0)
                 {
                     Write-Host "[Alert] MailItemsAccessed Throttling: More than 1000 MailItemsAccessed Audit Records were generated in less than 24 hours ($Count)" -ForegroundColor Red
+                }
+            }
+        }
+
+        # LETHAL-074: Suspicious Sync Access Operation(s) --> Mailbox Synchronization for Offline Usage / Exfiltration
+        # Note: Sync access is recorded when a mailbox is accessed by a desktop version of the Outlook client for Windows or Mac.
+        # Important: The Microsoft Outlook Data File aka Offline Storage Table (.ost) will remain on the Threat Actors Device after containment/remediation!
+        if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\Hunt.csv")
+        {
+            if(Test-Csv -Path "$OUTPUT_FOLDER\UnifiedAuditLogs\Accessed-Mailbox-Items\CSV\Hunt.csv" -MaxLines 2)
+            {
+                $Import = $MailItemsAccessed | Where-Object { $_.MailAccessType -eq "Sync" } | Where-Object { $_.ResultStatus -eq "Succeeded" } | Sort-Object { $_.CreationTime -as [datetime] } -Descending
+                $Count = ($Import | Measure-Object).Count
+                if ($Count -gt 0)
+                {
+                    Write-Host "[Alert] Potential Mailbox Synchronisation for Offline Usage / Exfiltration via Sync Access detected ($Count Outlook Folders)" -ForegroundColor Red                  
                 }
             }
         }
@@ -9386,8 +9517,8 @@ if ($Result -eq "OK" )
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUOqSSmd1m9whSD3E3dzxGUele
-# THuggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUKvUBxRaYRo0YT3q0gt0feub6
+# I+OggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -9589,33 +9720,33 @@ if ($Result -eq "OK" )
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBRTKpFKqHz9lMPNsk8s5iN3tmkfGDANBgkqhkiG9w0B
-# AQEFAASCAgBntf9o8rui0aWyQhgnC+Mdha4icXV70dtqyWl/RVQD38/aTk/Pha02
-# ke0CMD3KabY9BBTNxPCb52oDCdlcSd0CVIFkPC13tYASW0e1GhKMmNjJwT/zPnZO
-# u6RWWL5CPcw2+pIOUr7VQfRpGKQ9Pc0EC0ItGE+HaxImqaARU0P8UOJ8W6L55DCN
-# irHXqtjWmVqKF7lobZQFl4HmLs4XM45KEJCHh10+tGeYKHsvi7cK22xKxOu4jMJV
-# fk+ulrateDPpVgAf1aaiyGBeWXJBRNua5AXhv9QxMxhW+XRnk8esZpP1jS18UqOA
-# F/vWSdaHEkRk4Pvh2wDVcdtiD5swPg2gWwUP8o3w9d4R8ZNhtPCrg2Fs5TffwoFW
-# S9rvX32mdoJaladuAq/K6tuJhhGPjISOZZW7fpaNQQcTTCMUsWy6ArA8JWJ+EQbg
-# L6ZwRkr0DkgYYA5pg8uhj4uiWeQZXPM6+/s19iExC1iDAPffmbe1oizfsKQw5U3j
-# TAYyyNKQXfRffMqkYTu76PL/pNHV7ITvxWeqGCnOzeE4SA+xk4GDNJFrhWA5eFjV
-# CEkBE4HB4CfOpgrwWeSV66CdwuNtnTfWgeeRUhULryTJ528QZpBSuTmdrfF1X38I
-# Btmam1HQNrVDqC1W5Hc8lByYUkcbVPKK/QWtEK95SGetvlb+/7pwf6GCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBR222aM7BjE+1OOF20xB4sd9qg0tzANBgkqhkiG9w0B
+# AQEFAASCAgClE1n5c+TJpjzZTugUQBh00mUzAvuDbD7qot1Uj7k06a82UOsYOfhy
+# uga3rBXw8Yq9ARnrzWi9EyzAvaC7XwM9OhAYsLhIVPM8P9j86Hpe73BxDT06k0IS
+# ibs2JksmXItXUxyOi1ThpZhTNvDuYhyP1KVw5VkYPyCJwsRs0+aToqJna6PEpvLi
+# dqWieSg22J5vVBbU3bTSqa35sbuWElhHM4QnrQb6SUrhi3mKgKW3c2quy+tJr1wu
+# DPoyCzTbmIR/XclcwG/+/E0HF82tyDjbRJql3uTXU+Yc4pmfandtN1n302udhxNV
+# yMIjBChLx3pXdQDp6g0EGjfQubxfR/yhd1ccKAe2SYGJj4hJmv+5y10NfWjTfj83
+# BiN59l8icnTGHdwVlLGFBGjols6fUHFARNPD+C/BYhS2gSnqkX63czmJ5p3wMUHu
+# HJjgniSCQUa0MugoQCJ1gJo6pXru/MIrGLc8LNzREApGRwbcDYKL/EnpypLM/OMR
+# 0hVpnhQKwveZxbh1kFj27dyPsg8y3XaYT0hb5Z+C2uG115JcNenC+o05hmUib18x
+# rVS4fzlQUMXM5aCM9akUjMarSuyQLVmpDrN0kfOzVWqSjqAowwFue8wfHbsYksyM
+# LtHez8nseGhsIhnmtlOOTLdB1gMGda9nI+XefULsVTxaGjRhKt6uVqGCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
-# AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI1
-# MTAyMTA1MzE1NFowPwYJKoZIhvcNAQkEMTIEMARaVGSt3MpQysDCid4RLYyMgj0J
-# GAhBxDc1hcspHdKAwzF21BGVT7yi9hHJtKpc9DANBgkqhkiG9w0BAQEFAASCAgCl
-# zPNcnkXTHpAbLYTmWiOka4f31KoWhXs8wx5LMBelHRwtPWv60EYonpCeS2A/5Hhz
-# T+6LgpSgN70Vci74+3WvzxsLjiH8w2+IgjUei8PuFrfSmjB16yabQYb5bg4usZzt
-# UwjILadhtf0Pp1dGhDiJiia5BL4jHo5ssQ0J0NtgwKXU9pUCjF6ecVIFBGR8MAdZ
-# nTyNsgJv2O/DdsNBcsWwYCPMFWCUzYPo1645UGZxcOnP5oj9LZIoJZsiMB/WJOKe
-# kJVOfqZEiz7bqRy3RybvRFeX0Dr9rvl160QFgBtgSYsVwHxp/6Yd6ev044BIJZng
-# uk3aWNzVGH1n2+U5OO2g9GnMfZB21WpEFtToGnMkMrMQcxk9k1pvICnIt3KsK7NJ
-# vVlRgh8v9vcb0e8RyKtDO0jajSi7RSpK+4fEhH3NQx2Wly4lwuO90tQ5BN5/C7be
-# KYTd4cZ0HJKlb5+776+O9RiEKcPP+IAi0bi+XU3p526BSJ1PEVCrshxe65BAdscN
-# AO9Xpa5XUZZJoBwVi9RLhLS295MlCRF4MLl8MnIZvsGndep8zLEJngN44/8jodK5
-# Ss+FotJmMmhkuGKLqiT52zOagpe0Y2dRsETtuwdC3CdcBnU+YQlNN7vawzfRXxDK
-# 5aVlYPw5acfCmJ6e6R14b8a6Q1bVL+Q6QP+Q1DIfxw==
+# AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2
+# MDUwMTEwNTAzNVowPwYJKoZIhvcNAQkEMTIEMIi6m9rowwa9+4YSBl6+584/BcWG
+# /gvkRP52yaId2r1MhYe1Mj2ZSoXYjSjOSCjrIzANBgkqhkiG9w0BAQEFAASCAgBs
+# CeQgH6pnRDiWm77JQlO0D0Y7cOh0/EjljiZllnY4OptY8KaZsFfqAbcnbiYEjl0H
+# W589pjRjjwTMPvP2AOI7UVjF+ngbWg/hpkB/ePO0Ui4DOThcTRbKlmotSrChQeGL
+# VnrDZ1ej76wBn9HHq3+Dr02egbPyAMY65AVLMqhBH7IjKhmyZflr8ptEx9D1PHbV
+# REtDRQzbgb7ATV92qiT/qWoQPqqBxAiSPM5Kl6YJrtKHQCkDoNFdVeQy0eYmNRwv
+# 1ZdlsKZE+FYDYwKZIz3MN6ugoOQ/IPZPiZ9Xa2ImkhzPm2qaRerWckkOA9oF1IOG
+# VDsYsGRl5PM4kPStBx5l1u42ZkLZ2lH/rvHAm4h7QTo0ZEddCaeCb7LtTSzaGF+9
+# t+c5AbvpwrHYN9GNZ3TJt/COdG/L85v8/5qJ4nycv3kUKKxtKftTt/00JpzkVf6C
+# 8smBH5zysit3b5Z/E41PP/QOsuiyJEenBF2kjo8MS2+JY+ACjqsrU6PxfeXWZIRl
+# ILJ+jMGzuno5JgxxrMFFfL2B/F/aFksUxk5AVbU+aYoEoISA+6xy3MHYW/HvG6pw
+# U2b2hV/UYbmCvlwbBLKn4QJvm74Sg4D1fbs6z+Q0s4r3lD1ORxxZ0F8Np+mjwOR+
+# UL2Q5arM77d4tFFqeN+0OFp30q6FYx3+qyxO9oHB6A==
 # SIG # End signature block

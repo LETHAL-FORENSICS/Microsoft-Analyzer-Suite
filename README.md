@@ -8,7 +8,7 @@ Automated Processing of Microsoft 365 Logs and Microsoft Entra ID Logs extracted
 
 ## The following Microsoft data sources are supported yet:
 
-> Output Files of Microsoft-Extractor-Suite v4.0.1 by Invictus-IR
+> Output Files of Microsoft-Extractor-Suite v4.0.2 by Invictus-IR
   * [Get-AdminUsers](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieve-all-administrator-directory-roles) &#8594; [Admins-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/Admins%E2%80%90Analyzer)  
   * [Get-Devices](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/Devices.html) &#8594; [Devices-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/Devices%E2%80%90Analyzer)  
   * [Get-GraphEntraAuditLogs](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/AzureAuditLogsGraph.html) &#8594; [EntraAuditLogs-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/EntraAuditLogs%E2%80%90Analyzer)  
@@ -22,6 +22,7 @@ Automated Processing of Microsoft 365 Logs and Microsoft Entra ID Logs extracted
   * [Get-RiskyDetections](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieves-the-risky-detections) &#8594; [RiskyDetections-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/RiskyDetections%E2%80%90Analyzer)
   * [Get-RiskyUsers](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieves-the-risky-users) &#8594; [RiskyUsers-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/RiskyUsers%E2%80%90Analyzer)  
   * [Get-UAL](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/M365/UnifiedAuditLog.html#extract-unified-audit-logs) &#8594; [UAL-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/UAL%E2%80%90Analyzer)  
+  * [Get-UALGraph](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/M365/UnifiedAuditLogGraph.html) &#8594; [UALGraph-Analyzer*](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/UALGraph%E2%80%90Analyzer) 
   * [Get-Users](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieve-information-for-all-users) &#8594; [Users-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/Users%E2%80%90Analyzer)  
   * [Get-TransportRules](https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/M365/TransportRules.html) &#8594; [TransportRules-Analyzer](https://github.com/LETHAL-FORENSICS/Microsoft-Analyzer-Suite/wiki/TransportRules%E2%80%90Analyzer)  
   
@@ -82,3 +83,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 [Microsoft First Party App Name Lookup](https://github.com/merill/microsoft-info/)  
 [Tenable - Dangerous Delegated Permissions Affecting the Tenant](https://www.tenable.com/indicators/ioe/entra/DANGEROUS-DELEGATED-PERMISSIONS-AFFECTING-THE-TENANT)  
 [Tenable - Dangerous Application Permissions Affecting the Tenant](https://www.tenable.com/indicators/ioe/entra/DANGEROUS-APPLICATION-PERMISSIONS-AFFECTING-THE-TENANT)  
+[OAuthSentry - OAuth Application Intelligence](https://oauthsentry.github.io/#/search)  

@@ -2,6 +2,18 @@
 
 All changes to the Microsoft-Analyzer-Suite will be documented in this file.  
 
+## [1.7.1] - 2026-05-01
+### Added
+- UAL-Analyzer: Mailbox Synchronization for Offline Usage / Data Exfiltration via Sync Access
+- UAL-Analyzer: SharePoint Synchronization for Offline Usage / Data Exfiltration via FileSyncDownloadedFull
+- UAL-Analyzer: AtpDetection
+- UAL-Analyzer: SearchQueryInitiatedExchange
+- UAL-Analyzer: SearchQueryInitiatedSharePoint
+- UAL-Analyzer: UserAuthenticationMethod (Bitfield Mapping)
+
+### Fixed
+- Minor fixes and improvements
+
 ## [1.7.0] - 2025-10-21
 ### Added
 - ServicePrincipal-Analyzer
