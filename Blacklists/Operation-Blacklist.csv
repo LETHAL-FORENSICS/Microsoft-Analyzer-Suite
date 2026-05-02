@@ -31,7 +31,7 @@
 "Set-MailboxJunkEmailConfiguration","Configure a Junk E-Mail rule for a specific mailbox (Outbound Spam)","Red"
 "Set-TransportRule","Logged when an administrator modifies an existing transport rule.","Red"
 "ThreatIntelligenceAtpFile","Indicates activity related to Microsoft Defender for Office 365, specifically tracking actions associated with malicious files, such as those detected in email attachments or SharePoint/OneDrive/Teams files.","Red"
-"Update application Certificates and secrets management","Records when a user or administrator adds, removes, or modifies the credentials (certificates or client secrets) for an application registered in Entra ID.","Red"
+"Update application – Certificates and secrets management ","Records when a user or administrator adds, removes, or modifies the credentials (certificates or client secrets) for an application registered in Entra ID.","Red"
 "Update application.","Indicates that an Entra ID application or service principal has been modified.","Red"
 "Update service principal.","Records modifications made to an existing service principal within Entra ID.","Red"
 "UpdateInboxRules","The operation 'UpdateInboxRules' is typically seen when rules are created or modified via an Outlook Desktop client using the EWS API.","Red"
