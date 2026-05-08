@@ -26,6 +26,7 @@
 "SearchQueryInitiatedSharePoint","Logged when a user submits a search query in SharePoint Online.","Red"
 "Set-AdminAuditLogConfig","Logged when an administrator modifies the audit logging configuration (Anti-Forensics)","Red"
 "Set-InboxRule","Modify an existing Inbox Rule in a mailbox","Red"
+"set-InboxRule","Modify an existing Inbox Rule in a mailbox","Red"
 "Set-Mailbox","Change an existing mailbox, often used for setting up forwarding rules","Red"
 "Set-MailboxFolderPermission","Set permissions on a mailbox folder","Red"
 "Set-MailboxJunkEmailConfiguration","Configure a Junk E-Mail rule for a specific mailbox (Outbound Spam)","Red"
