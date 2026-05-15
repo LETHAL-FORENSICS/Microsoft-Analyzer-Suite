@@ -20,3 +20,4 @@
 "81010","Interrupted","Seamless SSO failed because the user's Kerberos ticket has expired or is invalid."
 "81012","Interrupted","The user trying to sign in to Entra ID is different from the user signed into the device."
 "81014","Interrupted","The DesktopSSO auth token has expired."
+"500014","Error","The service principal for resource '{identifier}' is disabled. This indicate that a subscription within the tenant has lapsed, or that the administrator for this tenant has disabled the application, preventing tokens from being issued for it."
