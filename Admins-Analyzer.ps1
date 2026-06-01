@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2026 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2026-05-01
+# @date:      2026-06-01
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -22,7 +22,7 @@
 #
 #
 # Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.2
 #
 #
 #############################################################################################################################################################################################
@@ -35,7 +35,7 @@
 .DESCRIPTION
   Admins-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of the Admin Directory Roles extracted via "Microsoft-Extractor-Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.2)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.1.0)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/Azure/GetUserInfo.html#retrieve-all-administrator-directory-roles
 
@@ -433,8 +433,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU4XqKkkprBsYfN1a80UVeWLU3
-# nuCggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUJrNmnjVFgJU7KFdbhfk0SEWb
+# KgyggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -636,33 +636,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBQsigOQHXAgVm+V80JxfxxaIWfwKDANBgkqhkiG9w0B
-# AQEFAASCAgAHKMyY02qJ3JS2PvS4UPqlqMAoecZ0Q9aAsTxijEHoRZDZF/3rISat
-# NBUBLhytIp4xBiIKib2piGpYxB/gKWEvT+sZUS2CsyWYbmvWkoOhIjzAyteCK5gQ
-# TOmJHwSc214N1oavTLMCGFiYng7qIR4KrERQt5JB3a0tIvaexaD7wTdzB/839WnX
-# zGN8ecYGs6xNUC1VYDov3KpUggzExzb0yIARgLL+sxmXin9MO0/qMxK1X0g1ULOb
-# S4j4cEE9y+FrYUKIFtKwmI5s1y5v3WQKsMBrUVEb3iMH8RG8WEeBsgszjqdVOqtD
-# B77D20JEvV6FggqBnk5DmYnVtt3zv7ND+i/yBS8XOrRnEHrPCe8VYHLN7vVqkgDg
-# ZNqdDN/2idhcAMtqSzmKAmqmM8bU4MI+91Gg5A52c9vQfvaX4wNz8xbstfjX7Lem
-# KRkRmnSRfr1aLPqmbkc4+ZK7N08rRZw3B08yzSgrxF4/YqD/d2N91lEFkHw31jul
-# 7iEAbH+3lay6mUQRoTymq8eLQXrsnAreYDoIVrMu+76bdhhGwCnjWkol+rFM8MBW
-# mXCXLfMevGNO1Hc3zbXczlPSJyO8nf0L3InU6d/TwnOvbcNBFT1TjwrMpJeYH505
-# w8fQLyprSx0SUMkT0+E5vXJtm/sKA552lAM6AC573Yk9HW9Tzf0BqKGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQBMsoL8xm6LtqFHEduXuSS8/yQTDANBgkqhkiG9w0B
+# AQEFAASCAgCDXkiRaSJ9gzkACUmGIVw7A9iQhTcMp3eKYDQ0H413WLvLZXCEFmAh
+# pJlC5X4khKRWT2klbUCQYXd81lkkkV5CB+YXBFsISO8bTq+kMgLIGBdoOFs+pGld
+# G+MRL86E2dlI9zYTIyIYGSd0O5U7CbPvFUJADoIjqwt1nltnjB6foa6gKi3cGXFn
+# dW45fptzuFoAQadBDHrVH8j66gTXVllLbPvkzbzDiVt6Fu6KS0aes/qSR5cuVgbp
+# FQhcsK/FQS+bTBFXWVd0185oBUa3RDjy+GCa5DWDy5Rz2U2phnm3ZIrI0Dp/j8UN
+# 1cLfAC/aICqtqVdNI6CqItDPigFZIY5OYz1JmPaoJt9iRVcrzIUsGJNMXzGNbgaM
+# gWuzPNZQIOGV5yauad8gIM7l3GiMKuQbFfJML7Ogk50qYDZe3PajXMm9DZfUl9xf
+# x6svxq69rXsv6HTc0QFlTvT+xof1aWo6IC09xfXO7OhJn9/GT6OjNxyTu+4qEiWC
+# ycxpHGkuArg5JbdsnVaDNILfdKfMlGJa1x+yo6sStgMRWIUdGUiIeOWfiNV7pSJ8
+# wnpJYix2IldYS4BBHHbAiZGJZZmNkldr1DUqpWiciyv1vFUZSWY416SDIIap4Cm3
+# +4MUXb502zxF7Zp9vgTt7uk+CgO7XMTH2tSQOD3jubK5/Xh3KwWLZ6GCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2
-# MDUwMTEwNDk1NFowPwYJKoZIhvcNAQkEMTIEMDE3wLMd0oMSxRPQ6e8Usg/u5h4g
-# Q5tDj1RStXcC2rtTi7oJJ7A/B3OSWWo5j1mrzzANBgkqhkiG9w0BAQEFAASCAgAp
-# bFmSZWVxCyKzyT9OvDGvvXmFpCad3ksp7ns9KcBkdFs0fhkd2L1VaNicB2PVsOxn
-# 6MEilSfGq9eLsj4iJafXuQp6sVkfmS4+4qdDWxuA9Qv/BKu/CnDtPydy8x68UdBT
-# 9fmt+kKb04fQSyZ5CirQdLjcAh9Vz7y7bb1vpI7tkCehPL8CgIGj3OUuhJ5GtS+t
-# dd8da3e8ZvTq7F7LZYHnYq2LDVFcvq3g+4lwGsEOClop+3PO3Jg2xdNne5wu2zHM
-# 9oZ177Vmf06eFW+O+Itzc6K31Je9gOEXlGKvual+Nn45aDqqABla9aqgso7mpI7/
-# t4Tyld0MUp1bbNHrpK3LGbYeLk42so/ep1DStg4Czr+xuwkfWOxhubufJT638Cg4
-# 9CM5C3M9zXDb2ivVz1IfmzwVlEi02+JPzExybUEpIs42/UpEOrbBB8UaXk103enz
-# P9lhEzB3RRxDKAmHxTr1W3nPJUerab6fflJ/um+6coV/+Q0AcmqZ0joO4HAkwy0Q
-# yFdZAn42p6FNytrCUnvHPjZ+tRQ20sKTwf+SKF3VuP+s9RVIDeqX5G6d0oxSyoP1
-# +wUBjPzTBfPR9tsEOhvpo1I46r9Qdonw5BJdEJLlVjqk6IFhKiaaoMnfqvrmJbXr
-# QsnKOCUwBATv2gEt08qNDAzUkCKP/3qTD5RUy1f2ZQ==
+# MDYwMTA0NTgwMFowPwYJKoZIhvcNAQkEMTIEMObqpHhKZEmSTAbIr6IXOXs1RT6+
+# b9ZRDoOjAlJ5KtLbZnIOlBL3T+GZtjle3HNSQDANBgkqhkiG9w0BAQEFAASCAgAl
+# Gve/Sr51KT1T+c3/B6JMAawihtPKHkluIY7SHLO8lAJcVgxGGXFznWwSnEv3rEO1
+# jRYi+6N2oeoipDmE2MD9om5+rYdBpNOV7GAZ+7gZ8voFuBaEjc41oZ93pI0XgUKH
+# TmJ+gFBtJ0+M8omZPBJOezgc6XIzB+j7U8jHqSsJxH1hdjCkzla6ceGa+mdAzgAR
+# enY2d5FqIv7HHtDTLhNt0K5wH4zact9s2jF00auVPGFbwJcVmioaP/sz8WQsahgW
+# UfkTvzssDN+UFJuMfMV/Iw9triK6aFSu7/jEzEoBp+usXKD0xAm5jwWHkyfbTQ+I
+# JYX66MHd11LyiXxh7ESwi8s/2YtBYHk/P0Da0vGFqWKAmdPAp72OB5K5Gm/luaM+
+# nLdctakhivhyACjC8mvcmhYD/OfNeQLfqqSvrKyTintuqlaWu5unkXdPvON8SwrH
+# 8lGGErQKAh62a9ghoXdqhPGaHt7vTGNXXhptzB6oo9T7r5t/BTGFlB0oBubn4iOE
+# 1mDfiuUYYpWBwslLAcRV602gBpItLFjka/+XMancC6NLe6wfPfHaLqd1nVecPtRa
+# nTtuQT4Uu0lgDD05v4SUWHuov/N9uvHocTau+v45/eteFl0uH2LoLAD1ioI2bQ4Z
+# RM5+MRFnVB+FQpuq+naiCEGbcd/bVH4MsGG+00zyeA==
 # SIG # End signature block

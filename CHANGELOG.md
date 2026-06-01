@@ -2,6 +2,13 @@
 
 All changes to the Microsoft-Analyzer-Suite will be documented in this file.  
 
+## [1.8.0] - 2026-06-01
+### Added
+- UALGraph-Analyzer
+
+### Fixed
+- Minor fixes and improvements
+
 ## [1.7.1] - 2026-05-01
 ### Added
 - UAL-Analyzer: Mailbox Synchronization for Offline Usage / Data Exfiltration via Sync Access

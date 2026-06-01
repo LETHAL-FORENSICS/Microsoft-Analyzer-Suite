@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2026 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2026-05-01
+# @date:      2026-06-01
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -22,7 +22,7 @@
 #
 #
 # Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.1
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.2
 #
 #
 #############################################################################################################################################################################################
@@ -35,7 +35,7 @@
 .DESCRIPTION
   MailboxPermissions-Analyzer.ps1 is a PowerShell script utilized to simplify the analysis of the Delegated Mailbox Permissions extracted via "Microsoft-Extractor-Suite" by Invictus Incident Response.
 
-  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.0.2)
+  https://github.com/invictus-ir/Microsoft-Extractor-Suite (Microsoft-Extractor-Suite v4.1.0)
 
   https://microsoft-365-extractor-suite.readthedocs.io/en/latest/functionality/M365/MailboxDelegatedPermissions.html
 
@@ -400,8 +400,8 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # SIG # Begin signature block
 # MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQURqzK/QZYmdwtlOMgpYuJjqQq
-# 1D+ggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUQY6o2djl8VVQkDKIgWCpEPr/
+# q3KggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -603,33 +603,33 @@ $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
 # Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
 # MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
 # DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBS74z6DeFTIr2cq/6MoDc66fMWcMjANBgkqhkiG9w0B
-# AQEFAASCAgAXny6F38GenrxmAVjLhzVZKlv8YZoDbS3mrqDuY3Ceit+zw/Zd0qh8
-# +OV+Suy1fXq9vbmzfLYwyCkKeM9dvzD2ncIDRT4XoDkaJfOZcNOtPij5k325FdkP
-# JO7qoj1VYN0hYY4kTqncn76ufcN0nClVpOugdpkdoMoKv1GiPzLLdNhzC4gLmhyN
-# z4WjpcDejhTqXdcwWB/n7MJg40yKqNSwMWW8PgYdvtHrydT3NWTAKG3iGJIRqgK3
-# NkY5IOYo/zABG4dpHGYCzizctqvysYfphCPUQiIh1sFOVp1eC8MjITbs1K+V8Dr9
-# AT8vvbfS+bB6ZAms/9P1R8onsXHpUBIDwJDZ3OLVyh4G9ZrsQK/E1j56YlhVh/J8
-# blUtBnL62WKS1K18RfaqbpkwLKqSEyiZSD03t3FxgnR+yhI+bOZ55/DocuRH7I6U
-# 4vR5zymEZrBU+nqCXJsPAPDxCOfGXkU/LJjvY5hS79J9NFjKBVQ1vbZnPnLJZRBh
-# eHhTOaJhEQdBzYWv7lUZFJ+yxjnGj6541D+SMAt085c66tIZ71g0QPlHC0owv2uM
-# uQMOU2Et/Yh8BoRe4QvQ6YdME6vJVjGC+cIjOv2lrlffqXwmZ+PgYlnuX4xLd1QY
-# Gt9ms8jz0+e5iUAS2aw+SmajQX1GEl7a8lThJDAcvB4lo9+IdWYm1qGCAyMwggMf
+# MCMGCSqGSIb3DQEJBDEWBBQ5AgkPERZQafQM78bDINcp3LBeOjANBgkqhkiG9w0B
+# AQEFAASCAgCODZhnG4UE8lOf0oddv1OElce37py0ltHXA5M9rNa+j9Tpn3LWWsI9
+# xniFOp7hlp9EBQI1Hbr9GAbhzEysMu4L+ZQQR8Bth5KfTzb9UjQFd0CVnnpXkFoh
+# F8Vs0jMCzM1FRaPK+uaPuiRvJycL1WCqbXAk6oy3sxZS3Z0UQ0haVO9xn7dMQVkh
+# bQRBl2C64yL8xYyElpgS47GJIJBW4vvhr57nSzoCqHMzzsGI5hWBVIxEAeyrCNmo
+# 7TXyDUKyjGuBBSY3kGiToEErXSe6Loxtk7DRSDZ4T7HbP/6ZeDKEzPQPkou/ThlT
+# NcuOg1/kz5h0kH9wwg74eeh+il60NeQ+BDH4F+XwozZjJvm35+vjFi6k1qwaaELR
+# GHL7d+p6pWjnTI6zQefFoLFZ2+vZarJUSOWekQSvzZYnnAZ1Fn8lk0v9QKAqGrBR
+# t5ahkZPYVkbZA9Iq/s/r6LEhyuS5aYNGaGdjGymsDLaTWUgktLn0Wdtcbn83xv8R
+# cFawkzHtbd7LCuFfyGNvBnYi7OsYSVw1U7RhTZfZQReRF40Og8Iuh+Q81DAn3dBc
+# 9leZ/rUQyG/ESMN/tfgBTKt5UNy0RPE+MA/pbEPd60Zoamj+l/MG9KPJhJ2DKVNj
+# DKENNFzfr9gSPZuPX45+CFaVY8LxGX6QR2xfcnTc09dqYut8XF/0T6GCAyMwggMf
 # BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
 # Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
 # U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
 # AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2
-# MDUwMTEwNTAxMFowPwYJKoZIhvcNAQkEMTIEMKVu0VdEi2bTWhhg/x9ShtSCPh7P
-# 44Qm49TcmhC34QiTTjI8XfPMBfOCSA49pFNByzANBgkqhkiG9w0BAQEFAASCAgDK
-# o1lmoI/l3omAOgNobBEadWaERQT7CyH2aTDMAlNf3OUZsB8weqMiXs+oq9XjJnYQ
-# beYU5zbn/vAmzIVXUGrkStu3x9E2eSoDlU+8QvPA6ZaQxVyPz+TM9ht0zumfx3Jv
-# V2nS1l2GjZATQaYcN+3vARCmXiNg25B2qFkjbfmmAzBGShx/KWwvUHjmpfKi4XSO
-# PD1kpw0y2cpas8jyTQIDh5YSTBxQ7pa/hVSTEoRyt2NxvGNsT/lssK6PUMpT+cka
-# to6z0MZECBV8dnXSSdotbRIoNHpfc5wGWZMnqQmydoBLMAGc8lLDFCMtDAsAc/VX
-# 2wv6jj1ounskaQPqtE3DB2p1GMAeKqZBa7gYTHJqf2dkmE5lFf4xT0iD+b+qDTkv
-# 2Q0/xRLkEvaFUnyjONOsj8lE9GAmulfjcl/0xlNc2lQEcq2WAcuSjLAUmgLAOz+q
-# FtWfgkNu0hY0vk0yZQ8Fwc7Rhbd3H9nezYmTpwmt82VGFv+b+pPPriMJfPybohDN
-# VKapi/Vy+nHvZ7NARIDfUevaeM6DcI/UuXTAJZlpB2NjG1BiCxJOY7GdQ7+jZXE8
-# ecHkpAc99UJ73861NJcKiiPThzsqTgBIJDCspg19nMi8pVzEJTJ7AcgjCJSIIpyN
-# JTubRP9ge8XkZ9ucCZ8E0Ue7E/q63xW6+1Mz1BrBWA==
+# MDYwMTA0NTgxNlowPwYJKoZIhvcNAQkEMTIEMJR8W4hFsTnSQgPlW770UrVyqGtd
+# NS0+sg9bi8L91f4zwEH2X7jJ6TXdVrSFR+OJyDANBgkqhkiG9w0BAQEFAASCAgAe
+# +q9mG36iuOQR6vfA9TqYqoECq51pVq8K/pfhFBCVWq4KBX3vMjA3lGXyqCcGw4Jp
+# 1Sv+PubDeSLua7my8YxV7TxFqkW7hEgWMAVg2oVF8Sfw/965rUHSjTk5cfnZit9c
+# JwTIAKKrDmIGjDDninl+aErr8+5ESVZEonO6rptMqCAMY1KBos7Lg7PlgpCxAv6O
+# z1FY9mX1Dhd0xEU25c+cpg+UubUUC27lISW7/q7OxtXHpnJjswYkXgcLd/TuEwsZ
+# 1M3wYIEKLXVdQg0uPiCaERwNRuA3HMwrhbiY6O32UocS28Sf3A0ouUrtCEujcvPV
+# f+qyte5R+zhTddhAa/kEQhYZqB1Xjf+zW6cVxazSMJx856Ss6SJSD5jDBFUwLQZR
+# he11kgiruZu7AccMhrVHL3/KWVEMN5xxP1s118PMPzM6LcuZn5u5dIKceYmRuKRR
+# 2OG0EfXB/ji47zIQA1+SN+jf9DmBPt2Jld189nwJeMXCDSkVZePJ5OJmKTMKe71X
+# N35UEXNfaF+IMv7c7PbObuSjZK2YxCv9yHZ0esbXdGgpuMYp/V7ex1UnGKnpOofQ
+# d7hdgSI28LhrLPEHWbUU6Ye0AuyLoPFmDPkcHMKmmUca3GIt5SWO1syqEkcrXmTw
+# HScrVJQ5RJrGLKQL4Ee6bL0yHCD4j6I3Gm+LHwe/6A==
 # SIG # End signature block
