@@ -24,6 +24,7 @@
 "Remove-MailboxPermission","Logged when an admin or user removes permissions (e.g. FullAccess) from a mailbox","Red"
 "SearchQueryInitiatedExchange","Logged when a user submits a search query in Exchange Online.","Red"
 "SearchQueryInitiatedSharePoint","Logged when a user submits a search query in SharePoint Online.","Red"
+"SecurityRiskInCallDetected","A security risk was detected during an incoming call in Microsoft Teams, such as brand, domain, or user impersonation.","Red"
 "Set-AdminAuditLogConfig","Logged when an administrator modifies the audit logging configuration (Anti-Forensics)","Red"
 "Set-InboxRule","Modify an existing Inbox Rule in a mailbox","Red"
 "set-InboxRule","Modify an existing Inbox Rule in a mailbox","Red"
