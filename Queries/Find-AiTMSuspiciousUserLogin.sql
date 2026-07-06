@@ -2,7 +2,7 @@
 -- Description: Identifies consecutive logins from different IP addresses which occur within about 30 seconds of each other. Indicates potential Adversary-in-The-Middle (AiTM) Phishing Attacks [T1557]. 
 -- Id: b9773013-8d87-4e92-960a-707a3ddd7927
 -- Author: Martin Willing
--- Date: 2026-05-18
+-- Date: 2026-06-14
 INSTALL inet;
 LOAD inet;
 WITH ResultSet AS (
@@ -67,7 +67,7 @@ IPinfo_Lite AS (
     IPinfo_Lite.as_name AS OrgName
   FROM ResultSet
   LEFT JOIN IPinfo_Lite
-    ON ResultSet.IPAddress::INET <<= IPinfo_Lite.cidr
+    ON TRY_CAST(IPAddress AS INET) <<= IPinfo_Lite.cidr
 ),
 TimeSpan AS (
   SELECT *,

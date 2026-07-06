@@ -2,7 +2,7 @@
 -- Description: Creates a view and breakdown of all relevant events to analyze attacker activity
 -- Id: 790ab6c0-e903-4844-946d-20cc0a114de4
 -- Author: Martin Willing
--- Date: 2026-05-19
+-- Date: 2026-06-14
 INSTALL inet;
 LOAD inet;
 WITH ResultSet AS (
@@ -130,5 +130,5 @@ SELECT
   Id
 FROM 'ResultSet'
 LEFT JOIN IPinfo_Lite
-  ON IPAddress::INET <<= IPinfo_Lite.cidr
+  ON TRY_CAST(IPAddress AS INET) <<= IPinfo_Lite.cidr
 ORDER BY CreationTime DESC;

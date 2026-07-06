@@ -4,7 +4,7 @@
 # @copyright: Copyright (c) 2026 Martin Willing. All rights reserved. Licensed under the MIT license.
 # @contact:   Any feedback or suggestions are always welcome and much appreciated - mwilling@lethal-forensics.com
 # @url:       https://lethal-forensics.com/
-# @date:      2026-06-01
+# @date:      2026-07-06
 #
 #
 # ██╗     ███████╗████████╗██╗  ██╗ █████╗ ██╗      ███████╗ ██████╗ ██████╗ ███████╗███╗   ██╗███████╗██╗ ██████╗███████╗
@@ -17,7 +17,7 @@
 #
 # Dependencies:
 #
-# DuckDB CLI v1.5.3 (2026-05-19)
+# DuckDB CLI v1.5.4 (2026-06-16)
 # https://duckdb.org/install/?platform=windows&environment=cli
 #
 # ImportExcel v7.8.10 (2024-10-21)
@@ -30,11 +30,12 @@
 #
 #
 # Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 5.1 (5.1.19041.6456)
-# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.2
+# Tested on Windows 10 Pro (x64) Version 22H2 (10.0.19045.6456) and PowerShell 7.6.3
 #
 #
 #############################################################################################################################################################################################
 #############################################################################################################################################################################################
+
 <#
 .SYNOPSIS
   UALGraph-Analyzer - Automated Processing of M365 Unified Audit Logs for DFIR
@@ -250,7 +251,7 @@ if (!(Test-Path "$($IPinfo)"))
 
 # Windows Title
 $DefaultWindowsTitle = $Host.UI.RawUI.WindowTitle
-$Host.UI.RawUI.WindowTitle = "UAL-Analyzer - Automated Processing of M365 Unified Audit Logs for DFIR"
+$Host.UI.RawUI.WindowTitle = "UALGraph-Analyzer - Automated Processing of M365 Unified Audit Logs for DFIR"
 
 # Flush Output Directory
 if (Test-Path "$OUTPUT_FOLDER")
@@ -503,24 +504,6 @@ if (Test-Path "$($IPinfo)")
     }
 }
 
-# Import JSON
-$Data = Get-Content -Path "$LogFile" -Raw | ConvertFrom-Json | Sort-Object { $_.createdDateTime -as [datetime] } -Descending
-
-# UserPrincipalName
-$UPN = $Data | Select-Object userPrincipalName | Sort-Object -Unique
-[int]$Count = ($UPN | Measure-Object).Count
-if ($Count -gt 1)
-{
-    Write-Host "[Error] Single User Audit ONLY." -ForegroundColor Red
-    Stop-Transcript
-    $Host.UI.RawUI.WindowTitle = "$DefaultWindowsTitle"
-    Exit
-}
-else
-{
-    $UserPrincipalName = ($UPN).userPrincipalName
-}
-
 # Input Size
 $InputSize = Get-FileSize((Get-Item "$LogFile").Length)
 Write-Output "[Info]  Total Input Size: $InputSize"
@@ -531,13 +514,8 @@ switch -File "$LogFile" { default { ++$Count } }
 $Rows = '{0:N0}' -f $Count
 Write-Output "[Info]  Total Lines: $Rows"
 
-# Count Records (w/ thousands separators)
-[int]$Count = ($Data | Measure-Object).Count
-$Records = '{0:N0}' -f $Count
-Write-Output "[Info]  Records: $Records"
-
 # Processing M365 Unified Audit Logs
-Write-Output "[Info]  Processing M365 Unified Audit Logs ($UserPrincipalName) ..."
+Write-Output "[Info]  Processing M365 Unified Audit Logs ..."
 New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\CSV" -ItemType Directory -Force | Out-Null
 New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX" -ItemType Directory -Force | Out-Null
 
@@ -559,6 +537,28 @@ Write-Output "[Info]  Importing Data into DuckDB ..."
 New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\DuckDB\Database" -ItemType Directory -Force | Out-Null
 $script:Database = "$OUTPUT_FOLDER\UnifiedAuditLog\DuckDB\Database\UnifiedAuditLog.duckdb"
 & $DuckDB $Database -c "CREATE OR REPLACE TABLE UAL AS SELECT * FROM read_json('$LogFile', ignore_errors=true), ORDER BY createdDateTime DESC;"
+
+# Count Records (w/ thousands separators)
+[int]$Count = & $DuckDB $Database -noheader -csv -c "SELECT COUNT(Id) FROM 'UAL';"
+$Records = '{0:N0}' -f $Count
+Write-Output "[Info]  Records: $Records"
+
+# UserPrincipalName
+[int]$Count = & $DuckDB $Database -noheader -csv -c "SELECT COUNT(DISTINCT UserPrincipalName) FROM 'UAL';"
+
+# Single User Audit
+if ($Count -eq 1)
+{
+    $UPN = & $DuckDB $Database -noheader -csv -c "SELECT DISTINCT UserPrincipalName FROM 'UAL';"
+    Write-Output "[Info]  UserPrincipalName: $UPN"
+}
+
+# Multi User Audit
+if ($Count -gt 1)
+{
+    $Users = '{0:N0}' -f $Count
+    Write-Output "[Info]  Multiple User Account(s) found: $Users"
+}
 
 # Time Frame
 $StartTime = & $DuckDB $Database -noheader -csv -c "SELECT MIN(createdDateTime) FROM 'UAL';"
@@ -638,7 +638,7 @@ if (Test-Path "$ParquetDatabase")
 if (Test-Path "$SCRIPT_DIR\Queries\Hunt.sql")
 {
     Write-Output "[Info]  Creating Hunt View ..."
-    $ResultSet = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Hunt.sql"
+    $ResultSet = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Hunt.sql" 2> $null
     $ResultSet | Out-File -FilePath "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\Hunt.csv" -Encoding UTF8
     $script:Hunt = $ResultSet | ConvertFrom-Csv | Select-Object * -ExcludeProperty "DecimalValue"
     $Hunt | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX\Hunt.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,7 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Hunt" -CellStyleSB {
@@ -725,7 +725,7 @@ if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\Hunt.csv")
 if (Test-Path "$SCRIPT_DIR\Queries\UserLoggedIn.sql")
 {
     Write-Output "[Info]  Creating UserLoggedIn View ..."
-    $UserLoggedIn = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\UserLoggedIn.sql"
+    $UserLoggedIn = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\UserLoggedIn.sql" 2> $null
     $UserLoggedIn | Out-File -FilePath "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\UserLoggedIn.csv" -Encoding UTF8
     $UserLoggedIn | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX\UserLoggedIn.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,6 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserLoggedIn" -CellStyleSB {
     param($WorkSheet)
@@ -791,80 +791,85 @@ if (Test-Path "$SCRIPT_DIR\Queries\UserLoggedIn.sql")
 }
 
 # UserLoginFailed (Interactive Sign-Ins)
-if (Test-Path "$SCRIPT_DIR\Queries\UserLoginFailed.sql")
+$PropertyCheck = & $DuckDB $Database -noheader -csv -c "SELECT EXISTS (SELECT 1 FROM 'UAL' WHERE Operation = 'UserLoginFailed');"
+$HasProperty = [System.Convert]::ToBoolean($PropertyCheck.Trim())
+if ($HasProperty)
 {
-    Write-Output "[Info]  Creating UserLoginFailed View ..."
-    $UserLoginFailed = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\UserLoginFailed.sql"
-    $UserLoginFailed | Out-File -FilePath "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\UserLoginFailed.csv" -Encoding UTF8
-    $UserLoginFailed | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX\UserLoginFailed.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,6 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserLoginFailed" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:AF1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of columns A-AF
-    $WorkSheet.Cells["A:AF"].Style.HorizontalAlignment="Center"
-
-    # Iterating over the Application-Blacklist HashTable - ObjectId
-    foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
+    if (Test-Path "$SCRIPT_DIR\Queries\UserLoginFailed.sql")
     {
-        $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$G1)))' -f $AppId
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["G:G"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+        Write-Output "[Info]  Creating UserLoginFailed View ..."
+        $UserLoginFailed = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\UserLoginFailed.sql" 2> $null
+        $UserLoginFailed | Out-File -FilePath "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\UserLoginFailed.csv" -Encoding UTF8
+        $UserLoginFailed | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX\UserLoginFailed.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,6 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserLoginFailed" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:AF1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns A-AF
+        $WorkSheet.Cells["A:AF"].Style.HorizontalAlignment="Center"
+
+        # Iterating over the Application-Blacklist HashTable - ObjectId
+        foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
+        {
+            $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$G1)))' -f $AppId
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["G:G"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+        }
+
+        # Iterating over the Application-Blacklist HashTable - AppId
+        foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
+        {
+            $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$H1)))' -f $AppId
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+        }
+
+        # Iterating over the ASN-Blacklist HashTable
+        foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("AS{0}",$M1)))' -f $ASN
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["M:N"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+
+            $ConditionValue = '=AND(NOT(ISERROR(FIND("AS{0}",$M1))),$S1<>"")' -f $ASN
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["S:S"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
+        }
+
+        # Iterating over the Country-Blacklist HashTable
+        foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$L1)))' -f $Country
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["K:L"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        # ConditionalFormatting - ObjectId
+        $Cells = "G:G"
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("4765445b-32c6-49b0-83e6-1d93765276ca",$G1)))' -BackgroundColor Yellow # OfficeHome (AiTM)
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("00000002-0000-0ff1-ce00-000000000000",$G1)))' -BackgroundColor Yellow # Office 365 Exchange Online (AiTM)
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("72782ba9-4490-4f03-8d82-562370ea3566",$G1)))' -BackgroundColor Yellow # Office 365 (AiTM)
+
+        # Iterating over the UserAgent-Blacklist HashTable
+        foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
+        {
+            $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$O1)))' -f $UserAgent
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+        }
+
+        # ConditionalFormatting - RequestType
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Consent:Set",$P1)))' -BackgroundColor Yellow # User Application Consent (Consent Permissions Grant)
+
+        # ConditionalFormatting - BrowserType
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["Z:Z"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$Z1)))' -BackgroundColor Red
+
+        }
     }
 
-    # Iterating over the Application-Blacklist HashTable - AppId
-    foreach ($AppId in $ApplicationBlacklist_HashTable.Keys) 
+    # LETHAL-0xx: 10+ UserLoginFailed operations per user on a single day
+    $Import = $UserLoginFailed | ConvertFrom-Csv
+    $Count = ($Import | Group-Object{($_.CreationTime -split "\s+")[0]} | Where-Object Count -ge 10 | Measure-Object).Count
+    if ($Count -ge 1)
     {
-        $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$H1)))' -f $AppId
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+        Write-Host "[Alert] Suspicious Operation(s) detected: 10+ UserLoginFailed operations per user on a single day ($Count)" -ForegroundColor Yellow
     }
-
-    # Iterating over the ASN-Blacklist HashTable
-    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
-    {
-        $ConditionValue = 'NOT(ISERROR(FIND("AS{0}",$M1)))' -f $ASN
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["M:N"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
-
-        $ConditionValue = '=AND(NOT(ISERROR(FIND("AS{0}",$M1))),$S1<>"")' -f $ASN
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["S:S"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
-    }
-
-    # Iterating over the Country-Blacklist HashTable
-    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
-    {
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$L1)))' -f $Country
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["K:L"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
-    }
-
-    # ConditionalFormatting - ObjectId
-    $Cells = "G:G"
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("4765445b-32c6-49b0-83e6-1d93765276ca",$G1)))' -BackgroundColor Yellow # OfficeHome (AiTM)
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("00000002-0000-0ff1-ce00-000000000000",$G1)))' -BackgroundColor Yellow # Office 365 Exchange Online (AiTM)
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("72782ba9-4490-4f03-8d82-562370ea3566",$G1)))' -BackgroundColor Yellow # Office 365 (AiTM)
-
-    # Iterating over the UserAgent-Blacklist HashTable
-    foreach ($UserAgent in $UserAgentBlacklist_HashTable.Keys) 
-    {
-        $Severity = $UserAgentBlacklist_HashTable["$UserAgent"][1]
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$O1)))' -f $UserAgent
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
-    }
-
-    # ConditionalFormatting - RequestType
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Consent:Set",$P1)))' -BackgroundColor Yellow # User Application Consent (Consent Permissions Grant)
-
-    # ConditionalFormatting - BrowserType
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["Z:Z"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Other",$Z1)))' -BackgroundColor Red
-
-    }
-}
-
-# LETHAL-0xx: 10+ UserLoginFailed operations per user on a single day
-$Import = $UserLoginFailed | ConvertFrom-Csv
-$Count = ($Import | Group-Object{($_.CreationTime -split "\s+")[0]} | Where-Object Count -ge 10 | Measure-Object).Count
-if ($Count -ge 1)
-{
-    Write-Host "[Alert] Suspicious Operation(s) detected: 10+ UserLoginFailed operations per user on a single day ($Count)" -ForegroundColor Yellow
 }
 
 $EndTime_DuckDB = (Get-Date)
@@ -963,7 +968,7 @@ New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\Stats" -ItemType Directory -Force | Out
 # ActorInfoString (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\ActorInfoString.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\ActorInfoString.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\ActorInfoString.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\ActorInfoString.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ActorInfoString" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -980,34 +985,39 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\ActorInfoString.sql")
 }
 
 # AppId / AppDisplayName (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\Stats\AppId-AppDisplayName.sql")
+$ColumnCheck = & $DuckDB $Database -noheader -csv -c "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'UAL' AND column_name = 'AppId');"
+$HasColumn = [System.Convert]::ToBoolean($ColumnCheck.Trim())
+if ($HasColumn)
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\AppId-AppDisplayName.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\AppId-AppDisplayName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppId" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of column A-D
-    $WorkSheet.Cells["A:D"].Style.HorizontalAlignment = "Center"
-
-    # Iterating over the Application-Blacklist HashTable
-    foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
+    if (Test-Path "$SCRIPT_DIR\Queries\Stats\AppId-AppDisplayName.sql")
     {
-        $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $AppId
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity   
-    }
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\AppId-AppDisplayName.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\AppId-AppDisplayName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppId" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of column A-D
+        $WorkSheet.Cells["A:D"].Style.HorizontalAlignment = "Center"
 
-    # ConditionalFormatting - AppDisplayName
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third-Party Application",$B1)))' -BackgroundColor Yellow
+        # Iterating over the Application-Blacklist HashTable
+        foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
+        {
+            $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $AppId
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity   
+        }
 
+        # ConditionalFormatting - AppDisplayName
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third-Party Application",$B1)))' -BackgroundColor Yellow
+
+        }
     }
 }
 
 # ASN (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\ASN.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\ASN.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\ASN.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\ASN.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ASN" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1034,7 +1044,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\ASN.sql")
 # ClientInfoString (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\ClientInfoString.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\ClientInfoString.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\ClientInfoString.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\ClientInfoString.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ClientInfoString" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1053,7 +1063,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\ClientInfoString.sql")
 # CountryCode / CountryName (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\CountryCode-CountryName.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\CountryCode-CountryName.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\CountryCode-CountryName.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\CountryCode-CountryName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Countries" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1081,7 +1091,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\CountryCode-CountryName.sql")
 # DeviceProperties (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\DeviceProperties.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\DeviceProperties.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\DeviceProperties.sql" 2> $null
     $Objects = $Stats | ConvertFrom-Csv
     $Count = ($Objects | Measure-Object).Count
     if ($Count -ge "1")
@@ -1106,7 +1116,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\DeviceProperties.sql")
 # IPAddress / CountryName (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\IPAddress-CountryName.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\IPAddress-CountryName.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\IPAddress-CountryName.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\IPAddress-CountryName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "IPAddress" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1138,10 +1148,10 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\IPAddress-CountryName.sql")
     }
 }
 
-# Operation
+# Operation (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\Operation.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\Operation.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\Operation.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\Operation.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Operations" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1163,7 +1173,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\Operation.sql")
 # RecordType (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\RecordType.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RecordType.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RecordType.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\RecordType.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RecordType" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1181,7 +1191,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\RecordType.sql")
 # RecordType / RecordId (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\RecordType-RecordId.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RecordType" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1195,7 +1205,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId.sql")
 # RecordType / RecordId / Workload (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId-Workload.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId-Workload.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId-Workload.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\RecordType-RecordId-Workload.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RecordType" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1209,7 +1219,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\RecordType-RecordId-Workload.sql")
 # RequestType (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\RequestType.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RequestType.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\RequestType.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\RequestType.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "RequestType" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1224,7 +1234,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\RequestType.sql")
 # UserAgent (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\UserAgent.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\UserAgent.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\UserAgent.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\UserAgent.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserAgent" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1246,7 +1256,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\UserAgent.sql")
 # UserAuthenticationMethod (Stats)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\UserAuthenticationMethod.sql")
 {
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\UserAuthenticationMethod.sql"
+    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Stats\UserAuthenticationMethod.sql" 2> $null
     $Objects = $Stats | ConvertFrom-Csv
     $Count = ($Objects | Measure-Object).Count
     if ($Count -ge "1")
@@ -1264,7 +1274,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\UserAuthenticationMethod.sql")
 # Sessions Duration
 if (Test-Path "$SCRIPT_DIR\Queries\Sessions\Sessions-Duration.sql")
 {
-    $Stats = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Sessions\Sessions-Duration.sql"
+    $Stats = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Sessions\Sessions-Duration.sql" 2> $null
     $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX\Sessions-Duration.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Sessions" -CellStyleSB {
     param($WorkSheet)
     # BackgroundColor and FontColor for specific cells of TopRow
@@ -1277,9 +1287,8 @@ if (Test-Path "$SCRIPT_DIR\Queries\Sessions\Sessions-Duration.sql")
 # Suspicious Sessions
 if (Test-Path "$SCRIPT_DIR\Queries\Sessions\Suspicious-Sessions.sql")
 {
-    $Sessions = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Sessions\Suspicious-Sessions.sql"
+    $Sessions = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Sessions\Suspicious-Sessions.sql" 2> $null
     $Sessions | Out-File -FilePath "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\Suspicious-Sessions.csv" -Encoding UTF8
-    #$Sessions | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX\Suspicious-Sessions.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Suspicious Sessions" -CellStyleSB {
     $Import = Import-Csv "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\Suspicious-Sessions.csv" -Delimiter "," -Encoding UTF8 | Select-Object SessionId, @{Name='IPAddress'; Expression={ $_.IPAddress -as [Int] }}, @{Name='Country'; Expression={ $_.Country -as [Int] }}, @{Name='ASN'; Expression={ $_.ASN -as [Int] }}, @{Name='OS'; Expression={ $_.OS -as [Int] }}, @{Name='BrowserType'; Expression={ $_.BrowserType -as [Int] }},@{Name='UserAgent'; Expression={ $_.UserAgent -as [Int] }}, @{Name='ClientInfoString'; Expression={ $_.ClientInfoString -as [Int] }}, @{Name='Devices'; Expression={ $_.Devices -as [Int] }}, @{Name='UserLoggedIn'; Expression={ $_.UserLoggedIn -as [Int] }}, @{Name='UniqueTokenId'; Expression={ $_.UniqueTokenId -as [Int] }}
     $Import | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\XLSX\Suspicious-Sessions.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Suspicious Sessions" -CellStyleSB {
     param($WorkSheet)
@@ -1331,7 +1340,7 @@ else
 if (Test-Path "$SCRIPT_DIR\Queries\Find-AiTMSuspiciousUserLogin.sql")
 {
     Write-Output "[Info]  Hunting for Adversary-in-The-Middle (AiTM) Phishing Attacks [T1557] ..."
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Find-AiTMSuspiciousUserLogin.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Find-AiTMSuspiciousUserLogin.sql" 2> $null
     $Import = $Result | ConvertFrom-Csv
     $Count  = ($Import | Measure-Object).Count
     if ($Count -gt 0)
@@ -1419,7 +1428,7 @@ New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\Stats\LineCharts" -ItemType Directory -
 # Operations (Line Chart)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\LineCharts\Operations.sql")
 {
-    $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Stats\LineCharts\Operations.sql"
+    $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Stats\LineCharts\Operations.sql" 2> $null
     $Import = $Result | ConvertFrom-Csv
     $Count  = ($Import | Measure-Object).Count
     if ($Count -gt 0)
@@ -1432,7 +1441,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\LineCharts\Operations.sql")
 # UserLoggedIn (Line Chart)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\LineCharts\UserLoggedIn.sql")
 {
-    $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Stats\LineCharts\UserLoggedIn.sql"
+    $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Stats\LineCharts\UserLoggedIn.sql" 2> $null
     $Import = $Result | ConvertFrom-Csv
     $Count  = ($Import | Measure-Object).Count
     if ($Count -gt 0)
@@ -1445,7 +1454,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Stats\LineCharts\UserLoggedIn.sql")
 # UserLoginFailed (Line Chart)
 if (Test-Path "$SCRIPT_DIR\Queries\Stats\LineCharts\UserLoginFailed.sql")
 {
-    $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Stats\LineCharts\UserLoginFailed.sql"
+    $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\Stats\LineCharts\UserLoginFailed.sql" 2> $null
     $Import = $Result | ConvertFrom-Csv
     $Count  = ($Import | Measure-Object).Count
     if ($Count -gt 0)
@@ -1565,7 +1574,7 @@ $StartTime_SuspiciousOperations = (Get-Date)
 # LETHAL-003: New-InboxRule --> Create a new Inbox Rule in a mailbox
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\New-InboxRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\New-InboxRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\New-InboxRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -1664,7 +1673,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\New-InboxRule.sql")
 # LETHAL-004: Set-InboxRule --> Modify an existing Inbox Rule, often used for setting up Email Forwarding Rules
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-InboxRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-InboxRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-InboxRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -1760,7 +1769,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-InboxRule.sql")
 # LETHAL-005: Remove-InboxRule --> Remove an existing Inbox Rule in a mailbox
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Remove-InboxRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Remove-InboxRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Remove-InboxRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -1798,7 +1807,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Remove-InboxRule.sql")
 # LETHAL-006: Enable-InboxRule --> Enable an existing Inbox Rule in a mailbox
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Enable-InboxRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Enable-InboxRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Enable-InboxRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -1836,7 +1845,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Enable-InboxRule.sql")
 # LETHAL-007: Disable-InboxRule --> Disable an existing Inbox Rule in a mailbox
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Disable-InboxRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Disable-InboxRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Disable-InboxRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -1874,7 +1883,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Disable-InboxRule.sql")
 # LETHAL-008: Email-Forwarding via New-InboxRule / Set-InboxRule
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -1971,7 +1980,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding.sql")
 # LETHAL-009: UpdateInboxRules (Exchange Web Services)
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2046,7 +2055,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-010: UpdateInboxRules + Create
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.RuleOperation -like "Create")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2058,7 +2067,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-011: UpdateInboxRules + Update
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.RuleOperation -like "Update")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2070,7 +2079,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-012: UpdateInboxRules + Delete
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.RuleOperation -like "Delete")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2084,7 +2093,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-013: UpdateInboxRules + AddMailboxRule
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.RuleOperation -like "AddMailboxRule")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2096,7 +2105,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-014: UpdateInboxRules + ModifyMailboxRule
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.RuleOperation -like "ModifyMailboxRule")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2108,7 +2117,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-015: UpdateInboxRules + RemoveMailboxRule
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.RuleOperation -like "RemoveMailboxRule")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2120,7 +2129,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-016: UpdateInboxRules + MoveToFolderAction
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.Actions -like "MoveToFolderAction")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2132,7 +2141,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-017: UpdateInboxRules + MarkAsReadAction
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.Actions -like "MarkAsReadAction")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2144,7 +2153,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-018: UpdateInboxRules + DeleteAction
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.Actions -like "DeleteAction")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2156,7 +2165,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-019: UpdateInboxRules + PermanentDeleteAction
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.Actions -like "PermanentDeleteAction")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2170,7 +2179,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-020: UpdateInboxRules + DeleteForwardToRecipientsAction
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.Actions -like "DeleteForwardToRecipientsAction")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2182,7 +2191,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-021: UpdateInboxRules + ForwardAsAttachmentToRecipientsAction
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.Actions -like "ForwardAsAttachmentToRecipientsAction")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2194,7 +2203,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-022: UpdateInboxRules + RedirectToRecipientsAction
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.Actions -like "RedirectToRecipientsAction")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2210,7 +2219,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\UpdateInboxRules.sql")
 # LETHAL-023: New-TransportRule - Creates a new Transport Rule in an organization
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\New-TransportRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\New-TransportRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\New-TransportRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2260,7 +2269,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\New-TransportRule.sql")
 # LETHAL-024: Set-TransportRule - Modify an existing Transport Rule in an organization
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-TransportRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-TransportRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-TransportRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2307,7 +2316,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-TransportRule.sql")
 # LETHAL-025: Email-Forwarding via New-TransportRule / Set-TransportRule
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding_TransportRule.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding_TransportRule.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding_TransportRule.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2319,7 +2328,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Email-Forwarding_Transp
 # LETHAL-026: Set-Mailbox - Change an existing mailbox, often used for setting up forwarding rules --> Email Collection: Email Forwarding Rule [T1114.003]
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2366,7 +2375,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 # LETHAL-027: Suspicious E-Mail Forwarding Rules (Set-Mailbox + DeliverToMailboxAndForward)
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.DeliverToMailboxAndForward -eq "True")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2378,7 +2387,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 # LETHAL-028: Suspicious E-Mail Forwarding Rules (Set-Mailbox + ForwardingAddress)
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.ForwardingAddress -match "@")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2390,7 +2399,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 # LETHAL-029: Suspicious E-Mail Forwarding Rules (Set-Mailbox + ForwardingSmtpAddress)
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv | Where-Object {($_.ForwardingSmtpAddress -match "@")}
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2403,7 +2412,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-Mailbox.sql")
 # https://learn.microsoft.com/en-us/powershell/module/exchangepowershell/set-mailboxjunkemailconfiguration?view=exchange-ps
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-MailboxJunkEmailConfiguration.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-MailboxJunkEmailConfiguration.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-MailboxJunkEmailConfiguration.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2469,7 +2478,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Set-MailboxJunkEmailCon
 # Description: An application was registered in Microsoft Entra ID. An application is represented by a service principal in the directory.
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-service-principal.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-service-principal.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-service-principal.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2510,7 +2519,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-service-principal.s
 # LETHAL-037: Suspicious Operation(s) detected: Add delegated permission grant.
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-delegated-permission-grant.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-delegated-permission-grant.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-delegated-permission-grant.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2542,7 +2551,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-delegated-permissio
 # LETHAL-038: Suspicious Operation(s) detected: Add app role assignment grant to user.
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-app-role-assignment-grant-to-user.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-app-role-assignment-grant-to-user.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-app-role-assignment-grant-to-user.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2583,7 +2592,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Add-app-role-assignment
 # Consent is the process of a user granting authorization to an application to access protected resources on their behalf. Detects when a user grants permissions to an Entra-registered application or when an administrator grants tenant-wide permissions to an application. An adversary may create an Entra-registered application that requests access to data such as contact information, email, or documents.
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Consent-to-application.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Consent-to-application.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\Consent-to-application.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2635,7 +2644,7 @@ if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\Consent-to-application.
 # Note: Related to Exchange Online Protection and Microsoft Defender for Office 365. Hygiene Events are related to Outbound Spam Protection. These events are related to users who are restricted from sending email.
 if (Test-Path "$SCRIPT_DIR\Queries\Suspicious-Operations\HygieneTenantEvents.sql")
 {
-    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\HygieneTenantEvents.sql"
+    $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\Suspicious-Operations\HygieneTenantEvents.sql" 2> $null
     $Data = $Result | ConvertFrom-Csv
     $Count  = ($Data | Measure-Object).Count
     if ($Count -gt 0)
@@ -2683,313 +2692,672 @@ Function Get-MailItemsAccessed {
 
 $StartTime_MailItemsAccessed = (Get-Date)
 
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed.sql")
+$PropertyCheck = & $DuckDB $Database -noheader -csv -c "SELECT EXISTS (SELECT 1 FROM 'UAL' WHERE Operation = 'MailItemsAccessed');"
+$HasProperty = [System.Convert]::ToBoolean($PropertyCheck.Trim())
+if ($HasProperty)
 {
-    Write-Output "[Info]  Creating MailItemsAccessed View ..."
-    $ResultSet = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed.sql"
-    $ResultSet | Out-File -FilePath "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv" -Encoding UTF8
-    $script:MailItemsAccessed = Import-Csv "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv" -Delimiter "," -Encoding UTF8
-    $MailItemsAccessed | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\MailItemsAccessed.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,7 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MailItemsAccessed" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:AM1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of columns A-AM
-    $WorkSheet.Cells["A:AM"].Style.HorizontalAlignment="Center"
-
-    # ConditionalFormatting - AppId
-    foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed.sql")
     {
-        $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$H1)))' -f $AppId
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["H:I"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity 
+        Write-Output "[Info]  Creating MailItemsAccessed View ..."
+        $ResultSet = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed.sql" 2> $null
+        $ResultSet | Out-File -FilePath "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv" -Encoding UTF8
+        $script:MailItemsAccessed = Import-Csv "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv" -Delimiter "," -Encoding UTF8
+        $MailItemsAccessed | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\MailItemsAccessed.xlsx" -NoHyperLinkConversion * -NoNumberConversion * -FreezePane 2,7 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MailItemsAccessed" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:AM1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns A-AM
+        $WorkSheet.Cells["A:AM"].Style.HorizontalAlignment="Center"
+
+        # ConditionalFormatting - AppId
+        foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
+        {
+            $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$H1)))' -f $AppId
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:I"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity 
+        }
+
+        # ConditionalFormatting - AppDisplayName
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["I:I"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third Party Application",$I1)))' -BackgroundColor Yellow
+
+        # ConditionalFormatting - ASN
+        foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("AS{0}",$M1)))' -f $ASN
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["M:N"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+
+            $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$M1))),$AI1<>"")' -f $ASN
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["AI:AI"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
+        }
+
+        # ConditionalFormatting - CountryName
+        foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$L1)))' -f $Country
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["K:L"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        # ConditionalFormatting - ClientInfoString
+        $Cells = "O:O"
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$O1)))' -BackgroundColor Red # eM Client (Traitorware)
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$O1)))' -BackgroundColor Red # eM Client (Traitorware)
+
+        # ConditionalFormatting - ActorInfoString
+        $Cells = "P:P"
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$P1)))' -BackgroundColor Red # eM Client (Traitorware)
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$P1)))' -BackgroundColor Red # eM Client (Traitorware)
+
+        # ConditionalFormatting - MailAccessType
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["X:X"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Sync",$X1)))' -BackgroundColor Yellow # Potential Mailbox Synchronisation for Offline Usage / Exfiltration via Sync Access
+
+        # ConditionalFormatting - InternetMessageId
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["AD:AD"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("<em",$AD1)))' -BackgroundColor Red # Messages sent by eM Client (Inbound and Outbound)
+
+        }
     }
 
-    # ConditionalFormatting - AppDisplayName
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["I:I"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third Party Application",$I1)))' -BackgroundColor Yellow
-
-    # ConditionalFormatting - ASN
-    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+    # Create 'MailItemsAccessed' Table
+    if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv")
     {
-        $ConditionValue = 'NOT(ISERROR(FIND("AS{0}",$M1)))' -f $ASN
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["M:N"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
-
-        $ConditionValue = '=AND(NOT(ISERROR(FIND("{0}",$M1))),$AI1<>"")' -f $ASN
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["AI:AI"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red # Colorize also the corresponding SessionId
+        & $DuckDB $Database -c "CREATE OR REPLACE TABLE 'MailItemsAccessed' AS SELECT * FROM read_csv('$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv', nullstr=' ');"
     }
 
-    # ConditionalFormatting - CountryName
-    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    # Stats
+    New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats" -ItemType Directory -Force | Out-Null
+
+    # ActorInfoString (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ActorInfoString.sql")
     {
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$L1)))' -f $Country
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["K:L"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ActorInfoString.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\ActorInfoString.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ActorInfoString" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns B-C
+        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+
+        # ConditionalFormatting - ActorInfoString
+        $Cells = "A:C"
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
+
+        }
     }
 
-    # ConditionalFormatting - ClientInfoString
-    $Cells = "O:O"
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$O1)))' -BackgroundColor Red # eM Client (Traitorware)
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$O1)))' -BackgroundColor Red # eM Client (Traitorware)
-
-    # ConditionalFormatting - ActorInfoString
-    $Cells = "P:P"
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$P1)))' -BackgroundColor Red # eM Client (Traitorware)
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$P1)))' -BackgroundColor Red # eM Client (Traitorware)
-
-    # ConditionalFormatting - MailAccessType
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["X:X"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Sync",$X1)))' -BackgroundColor Yellow # Potential Mailbox Synchronisation for Offline Usage / Exfiltration via Sync Access
-
-    # ConditionalFormatting - InternetMessageId
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["AD:AD"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("<em",$AD1)))' -BackgroundColor Red # Messages sent by eM Client (Inbound and Outbound)
-
-    }
-}
-
-# Create 'MailItemsAccessed' Table
-if (Test-Path "$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv")
-{
-    & $DuckDB $Database -c "CREATE OR REPLACE TABLE 'MailItemsAccessed' AS SELECT * FROM read_csv('$OUTPUT_FOLDER\UnifiedAuditLog\CSV\MailItemsAccessed.csv', nullstr=' ');"
-}
-
-# Stats
-New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats" -ItemType Directory -Force | Out-Null
-
-# ActorInfoString (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ActorInfoString.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ActorInfoString.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\ActorInfoString.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ActorInfoString" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of columns B-C
-    $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
-
-    # ConditionalFormatting - ActorInfoString
-    $Cells = "A:C"
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
-
-    }
-}
-
-# AggregatedFolders (Stats)
-$Total = ($MailItemsAccessed | Select-Object Folder | Measure-Object).Count
-if ($Total -ge "1")
-{
-    $Stats = $MailItemsAccessed | Group-Object Folder | Select-Object @{Name='Folder'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
-    $Stats | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\AggregatedFolders.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AggregatedFolders" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of columns B-C
-    $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
-    }
-}
-
-# AppId / AppDisplayName (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\AppId-AppDisplayName.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\AppId-AppDisplayName.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\AppId-AppDisplayName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppId" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of columns A-D
-    $WorkSheet.Cells["A:D"].Style.HorizontalAlignment = "Center"
-
-    # ConditionalFormatting - AppId
-    foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
+    # AggregatedFolders (Stats)
+    $Total = ($MailItemsAccessed | Select-Object Folder | Measure-Object).Count
+    if ($Total -ge "1")
     {
-        $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $AppId
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity   
+        $Stats = $MailItemsAccessed | Group-Object Folder | Select-Object @{Name='Folder'; Expression={if($_.Name){$_.Name}else{'N/A'}}},Count,@{Name='PercentUse'; Expression={"{0:p2}" -f ($_.Count / $Total)}} | Sort-Object Count -Descending
+        $Stats | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\AggregatedFolders.xlsx" -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AggregatedFolders" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns B-C
+        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+        }
     }
 
-    # ConditionalFormatting - AppDisplayName
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third Party Application",$B1)))' -BackgroundColor Yellow
+    # AppId / AppDisplayName (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\AppId-AppDisplayName.sql")
+    {
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\AppId-AppDisplayName.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\AppId-AppDisplayName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "AppId" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns A-D
+        $WorkSheet.Cells["A:D"].Style.HorizontalAlignment = "Center"
 
+        # ConditionalFormatting - AppId
+        foreach ($AppId in $ApplicationBlacklist_HashTable.Keys)
+        {
+            $Severity = $ApplicationBlacklist_HashTable["$AppId"][1]
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $AppId
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity   
+        }
+
+        # ConditionalFormatting - AppDisplayName
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Third Party Application",$B1)))' -BackgroundColor Yellow
+
+        }
     }
-}
 
-# ASN (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ASN.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ASN.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\ASN.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ASN" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of column A-D
-    $WorkSheet.Cells["A:D"].Style.HorizontalAlignment = "Center"
+    # ASN (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ASN.sql")
+    {
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ASN.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\ASN.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ASN" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of column A-D
+        $WorkSheet.Cells["A:D"].Style.HorizontalAlignment = "Center"
 
-    # ConditionalFormatting - ASN
-    foreach ($ASN in $AsnBlacklist_HashTable.Keys) {
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $ASN
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        # ConditionalFormatting - ASN
+        foreach ($ASN in $AsnBlacklist_HashTable.Keys) {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$A1)))' -f $ASN
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        }
     }
 
-    }
-}
-
-# ClientInfoString (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ClientInfoString.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ClientInfoString.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\ClientInfoString.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ClientInfoString" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of columns B-C
-    $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+    # ClientInfoString (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ClientInfoString.sql")
+    {
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\ClientInfoString.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\ClientInfoString.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ClientInfoString" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns B-C
+        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
     
-    # ConditionalFormatting - ClientInfoString
-    $Cells = "A:C"
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
-    Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
+        # ConditionalFormatting - ClientInfoString
+        $Cells = "A:C"
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eM Client/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["$Cells"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("Client=WebServices;eMClient/",$A1)))' -BackgroundColor Red # eM Client (Traitorware)
 
+        }
     }
-}
 
-# CountryCode / CountryName (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\CountryCode-CountryName.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\CountryCode-CountryName.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\CountryCode-CountryName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Countries" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of column A-D
-    $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
-
-    # ConditionalFormatting - CountryName
-    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    # CountryCode / CountryName (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\CountryCode-CountryName.sql")
     {
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$B1)))' -f $Country
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\CountryCode-CountryName.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\CountryCode-CountryName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Countries" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:D1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of column A-D
+        $WorkSheet.Cells["A:D"].Style.HorizontalAlignment="Center"
+
+        # ConditionalFormatting - CountryName
+        foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$B1)))' -f $Country
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["A:D"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        }
     }
 
-    }
-}
-
-# Folder (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\Folder.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\Folder.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\Folder.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Folder" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of column A-C
-    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
-    }
-}
-
-# IPAddress / CountryName (Stats)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\IPAddress-CountryName.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\IPAddress-CountryName.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\IPAddress-CountryName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "IPAddress" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:G1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of column A-G
-    $WorkSheet.Cells["A:"].Style.HorizontalAlignment="Center"
-
-    # ConditionalFormatting - ASN
-    foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+    # Folder (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\Folder.sql")
     {
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$D1)))' -f $ASN
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["D:E"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\Folder.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\Folder.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Folder" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of column A-C
+        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+        }
     }
 
-    # ConditionalFormatting - CountryName
-    foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+    # IPAddress / CountryName (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\IPAddress-CountryName.sql")
     {
-        $ConditionValue = 'NOT(ISERROR(FIND("{0}",$C1)))' -f $Country
-        Add-ConditionalFormatting -Address $WorkSheet.Cells["B:C"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\IPAddress-CountryName.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\IPAddress-CountryName.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "IPAddress" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:G1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of column A-G
+        $WorkSheet.Cells["A:"].Style.HorizontalAlignment="Center"
+
+        # ConditionalFormatting - ASN
+        foreach ($ASN in $AsnBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$D1)))' -f $ASN
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["D:E"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        # ConditionalFormatting - CountryName
+        foreach ($Country in $CountryBlacklist_HashTable.Keys) 
+        {
+            $ConditionValue = 'NOT(ISERROR(FIND("{0}",$C1)))' -f $Country
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["B:C"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor Red
+        }
+
+        }
     }
 
+    # MailAccessType (Stats) --> MailItemsAccessed events are triggered by two event types: Sync and Bind operations.
+    # Auditing Sync Access --> Sync access is recorded when a mailbox is accessed by a desktop version of the Outlook client for Windows or Mac.
+    # Auditing Bind Access --> Bind access is recorded when an individual message is accessed.
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\MailAccessType.sql")
+    {
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\MailAccessType.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\MailAccessType.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "IPAddress" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of column A-C
+        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+        }
     }
-}
 
-# MailAccessType (Stats) --> MailItemsAccessed events are triggered by two event types: Sync and Bind operations.
-# Auditing Sync Access --> Sync access is recorded when a mailbox is accessed by a desktop version of the Outlook client for Windows or Mac.
-# Auditing Bind Access --> Bind access is recorded when an individual message is accessed.
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\MailAccessType.sql")
-{
-    $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MailItemsAccessed\Stats\MailAccessType.sql"
-    $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\MailAccessType.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "IPAddress" -CellStyleSB {
-    param($WorkSheet)
-    # BackgroundColor and FontColor for specific cells of TopRow
-    Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
-    # HorizontalAlignment "Center" of column A-C
-    $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+    # OperationCount
+    # Note: The MailItemsAccess operation writes an aggregated 2-minute window of activity into a single audit record.
+    [int]$Sum = ($MailItemsAccessed | Select-Object OperationCount | Measure-Object -Property OperationCount -Sum).Sum
+    $OperationCount = '{0:N0}' -f $Sum
+    Write-Output "[Info]  Total Number of Accessed Mailbox Items: $OperationCount"
+
+    # Count
+    [int]$Bind = ($MailItemsAccessed | Where-Object { $_.MailAccessType -eq "Bind" } | Measure-Object).Count
+    [int]$Sync = ($MailItemsAccessed | Where-Object { $_.MailAccessType -eq "Sync" } | Measure-Object).Count
+    $BindAccess = '{0:N0}' -f $Bind
+    $SyncAccess = '{0:N0}' -f $Sync
+    Write-Output "[Info]  $SyncAccess Sync Access Operation(s) found"
+    Write-Output "[Info]  $BindAccess Bind Access Operation(s) found"
+
+    # Line Charts
+    New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\LineCharts" -ItemType Directory -Force | Out-Null
+
+    # Accessed Mailbox Items (per day)
+    if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\LineCharts\MailItemsAccessed.sql")
+    {
+        $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\MailItemsAccessed\LineCharts\MailItemsAccessed.sql" 2> $null
+        $Import = $Result | ConvertFrom-Csv
+        $Count  = ($Import | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            $ChartDefinition = New-ExcelChartDefinition -XRange CreationTime -YRange Count -Title "MailItemsAccessed" -ChartType Line -NoLegend -Width 1200
+            $Import | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\LineCharts\MailItemsAccessed.xlsx" -Append -WorksheetName "Line Chart" -AutoNameRange -ExcelChartDefinition $ChartDefinition
+        }
     }
-}
 
-# OperationCount
-# Note: The MailItemsAccess operation writes an aggregated 2-minute window of activity into a single audit record.
-[int]$Sum = ($MailItemsAccessed | Select-Object OperationCount | Measure-Object -Property OperationCount -Sum).Sum
-$OperationCount = '{0:N0}' -f $Sum
-Write-Output "[Info]  Total Number of Accessed Mailbox Items: $OperationCount"
+    # Throttling of MailItemsAccessed Audit Records
+    # If more than 1000 MailItemsAccessed audit records are generated in less than 24 hours, Exchange Online will stop generating auditing records for MailItemsAccessed activity. 
+    # When a mailbox is throttled, MailItemsAccessed activity won't be logged for 24 hours after the mailbox was throttled. 
+    # If the mailbox was throttled, there's a potential that mailbox could have been compromised during this period. 
+    # The recording of MailItemsAccessed activity will be resumed following a 24-hour period.
 
-# Count
-[int]$Bind = ($MailItemsAccessed | Where-Object { $_.MailAccessType -eq "Bind" } | Measure-Object).Count
-[int]$Sync = ($MailItemsAccessed | Where-Object { $_.MailAccessType -eq "Sync" } | Measure-Object).Count
-$BindAccess = '{0:N0}' -f $Bind
-$SyncAccess = '{0:N0}' -f $Sync
-Write-Output "[Info]  $SyncAccess Sync Access Operation(s) found"
-Write-Output "[Info]  $BindAccess Bind Access Operation(s) found"
+    # - Less than 1% of all mailboxes in Exchange Online are throttled
+    # - When a mailbox is throttling, only audit records for MailItemsAccessed activity aren't audited. Other mailbox auditing actions aren't affected.
+    # - Mailboxes are throttled only for Bind operations. Audit records for sync operations aren't throttled.
+    # - If a mailbox is throttled, you can probably assume there was MailItemsAccessed activity that wasn't recorded in the audit logs.
 
-# Line Charts
-New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\LineCharts" -ItemType Directory -Force | Out-Null
-
-# Accessed Mailbox Items (per day)
-if (Test-Path "$SCRIPT_DIR\Queries\MailItemsAccessed\LineCharts\MailItemsAccessed.sql")
-{
-    $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\MailItemsAccessed\LineCharts\MailItemsAccessed.sql"
-    $Import = $Result | ConvertFrom-Csv
-    $Count  = ($Import | Measure-Object).Count
+    # LETHAL-0xx: IsThrottled --> Mailbox Synchronisation for Offline Usage / Exfiltration
+    $Count = & $DuckDB $Database -noheader -csv -c "SELECT COUNT(DISTINCT Id) FROM 'MailItemsAccessed' WHERE IsThrottled = 'true';"
     if ($Count -gt 0)
     {
-        $ChartDefinition = New-ExcelChartDefinition -XRange CreationTime -YRange Count -Title "MailItemsAccessed" -ChartType Line -NoLegend -Width 1200
-        $Import | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MailItemsAccessed\Stats\LineCharts\MailItemsAccessed.xlsx" -Append -WorksheetName "Line Chart" -AutoNameRange -ExcelChartDefinition $ChartDefinition
+        Write-Host "[Alert] MailItemsAccessed Throttling: More than 1000 MailItemsAccessed Audit Records were generated in less than 24 hours ($Count)" -ForegroundColor Red
     }
+
+    # LETHAL-0xx: Suspicious Sync Access Operation(s) --> Mailbox Synchronization for Offline Usage / Exfiltration
+    # Note: Sync access is recorded when a mailbox is accessed by a desktop version of the Outlook client for Windows or Mac.
+    # Important: The Microsoft Outlook Data File aka Offline Storage Table (.ost) will remain on the Threat Actors Device after containment/remediation!
+    $Count = & $DuckDB $Database -noheader -csv -c "SELECT COUNT(DISTINCT Id) FROM 'MailItemsAccessed' WHERE MailAccessType = 'Sync' AND ResultStatus = 'Succeeded';"
+    if ($Count -gt 0)
+    {
+        Write-Host "[Alert] Potential Mailbox Synchronisation for Offline Usage / Exfiltration via Sync Access detected ($Count Outlook Folders)" -ForegroundColor Red 
+    }
+
+    $EndTime_MailItemsAccessed = (Get-Date)
+    $Time_MailItemsAccessed = ($EndTime_MailItemsAccessed-$StartTime_MailItemsAccessed)
+    ('MailItemsAccessed Processing duration: {0} h {1} min {2} sec' -f $Time_MailItemsAccessed.Hours, $Time_MailItemsAccessed.Minutes, $Time_MailItemsAccessed.Seconds) >> "$OUTPUT_FOLDER\Stats.txt"
 }
-
-# Throttling of MailItemsAccessed Audit Records
-# If more than 1000 MailItemsAccessed audit records are generated in less than 24 hours, Exchange Online will stop generating auditing records for MailItemsAccessed activity. 
-# When a mailbox is throttled, MailItemsAccessed activity won't be logged for 24 hours after the mailbox was throttled. 
-# If the mailbox was throttled, there's a potential that mailbox could have been compromised during this period. 
-# The recording of MailItemsAccessed activity will be resumed following a 24-hour period.
-
-# - Less than 1% of all mailboxes in Exchange Online are throttled
-# - When a mailbox is throttling, only audit records for MailItemsAccessed activity aren't audited. Other mailbox auditing actions aren't affected.
-# - Mailboxes are throttled only for Bind operations. Audit records for sync operations aren't throttled.
-# - If a mailbox is throttled, you can probably assume there was MailItemsAccessed activity that wasn't recorded in the audit logs.
-
-# LETHAL-0xx: IsThrottled --> Mailbox Synchronisation for Offline Usage / Exfiltration
-$Count = & $DuckDB $Database -noheader -csv -c "SELECT COUNT(DISTINCT Id) FROM 'MailItemsAccessed' WHERE IsThrottled = 'true';"
-if ($Count -gt 0)
-{
-    Write-Host "[Alert] MailItemsAccessed Throttling: More than 1000 MailItemsAccessed Audit Records were generated in less than 24 hours ($Count)" -ForegroundColor Red
-}
-
-# LETHAL-0xx: Suspicious Sync Access Operation(s) --> Mailbox Synchronization for Offline Usage / Exfiltration
-# Note: Sync access is recorded when a mailbox is accessed by a desktop version of the Outlook client for Windows or Mac.
-# Important: The Microsoft Outlook Data File aka Offline Storage Table (.ost) will remain on the Threat Actors Device after containment/remediation!
-$Count = & $DuckDB $Database -noheader -csv -c "SELECT COUNT(DISTINCT Id) FROM 'MailItemsAccessed' WHERE MailAccessType = 'Sync' AND ResultStatus = 'Succeeded';"
-if ($Count -gt 0)
-{
-    Write-Host "[Alert] Potential Mailbox Synchronisation for Offline Usage / Exfiltration via Sync Access detected ($Count Outlook Folders)" -ForegroundColor Red 
-}
-
-$EndTime_MailItemsAccessed = (Get-Date)
-$Time_MailItemsAccessed = ($EndTime_MailItemsAccessed-$StartTime_MailItemsAccessed)
-('MailItemsAccessed Processing duration: {0} h {1} min {2} sec' -f $Time_MailItemsAccessed.Hours, $Time_MailItemsAccessed.Minutes, $Time_MailItemsAccessed.Seconds) >> "$OUTPUT_FOLDER\Stats.txt"
 
 }
 
 # MailItemsAccessed Processing
+
+#############################################################################################################################################################################################
+#############################################################################################################################################################################################
+
+Function Get-TeamsActivities {
+
+# MicrosoftTeams - Events from Microsoft Teams
+# https://learn.microsoft.com/en-us/purview/audit-log-activities#teams-activities
+# https://learn.microsoft.com/en-us/purview/audit-log-detailed-properties
+# https://learn.microsoft.com/en-us/office/office-365-management-api/office-365-management-activity-api-schema#microsoft-teams-schema
+
+$StartTime_Teams = (Get-Date)
+
+# Check if Microsoft Teams Records exist
+$PropertyCheck = & $DuckDB $Database -noheader -csv -c "SELECT EXISTS (SELECT 1 FROM 'UAL' WHERE auditLogRecordType = 'MicrosoftTeams');"
+$HasProperty = [System.Convert]::ToBoolean($PropertyCheck.Trim())
+if ($HasProperty)
+{
+    # CallParticipantDetail - Added information about call participants
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\CallParticipantDetail.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\CallParticipantDetail.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\CallParticipantDetail.xlsx" -NoNumberConversion * -FreezePane 2,9 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "CallParticipantDetail" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:AO1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AO
+            $WorkSheet.Cells["A:AO"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("CallParticipantDetail",$H1)))' -BackgroundColor Red
+            
+            # ConditionalFormatting - ControlRequestAccepted
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["AK:AK"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("-",$AK1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # ChatCreated - A Teams chat was created.
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\ChatCreated.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\ChatCreated.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\ChatCreated.xlsx" -NoNumberConversion * -FreezePane 2,7 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "ChatCreated" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:Z1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-Z
+            $WorkSheet.Cells["A:Z"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("ChatCreated",$H1)))' -BackgroundColor Red
+
+            # ConditionalFormatting - CommunicationType
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("OneOnOne",$O1)))' -BackgroundColor Red
+
+            # ConditionalFormatting - HasForeignTenantUsers
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["R:R"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("true",$R1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # MeetingDetail - Added details about Teams meeting
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\MeetingDetail.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\MeetingDetail.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\MeetingDetail.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,9 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MeetingDetail" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:AA1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AA
+            $WorkSheet.Cells["A:AA"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("MeetingDetail",$H1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # MeetingParticipantDetail - Added information about meeting participants
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\MeetingParticipantDetail.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\MeetingParticipantDetail.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\MeetingParticipantDetail.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,9 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MeetingParticipantDetail" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:AC1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AC
+            $WorkSheet.Cells["A:AC"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("MeetingParticipantDetail",$H1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # ItemName
+    # AdHocMeeting - Indicates an unscheduled session. This logs when a user leverages the "Meet Now" button in a channel/chat, or abruptly escalates a basic 1:1 chat or call into a group meeting.
+    # Transfer - Captured when an active voice call or meeting session is routed from one user/device to another destination. 
+    # Escalation - Logs when a standard 1:1 voice or video call is structurally upgraded by adding extra participants, transforming the session into a multi-party conference bridge.
+    # CallQueue - Explicitly flags that the call originated from a configured Microsoft Teams Call Queue (e.g., helpdesk or customer service lines) before an available agent accepted and anchored it into a session.
+
+    # In Microsoft Teams, a Teams Call and a Teams Meeting (AdHocMeeting) might feel identical to an end-user—both involve audio, video, and screen sharing—but they are built on entirely different architectural frameworks.
+    # The primary difference is that a Teams Call is a direct, point-to-point connection between individuals, while an AdHocMeeting creates a dedicated conference infrastructure bridge on Microsoft’s servers to allow multi-party collaboration.
+
+    # MemberAdded - A team owner adds members to a team, channel, or group chat.
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\MemberAdded.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\MemberAdded.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\MemberAdded.xlsx" -NoNumberConversion * -FreezePane 2,8 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MemberAdded" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:W1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-W
+            $WorkSheet.Cells["A:W"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["G:G"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("MemberAdded",$G1)))' -BackgroundColor Yellow
+
+            # ConditionalFormatting - CommunicationType
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["I:I"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("OneOnOne",$I1)))' -BackgroundColor Red
+
+            # ConditionalFormatting - HasForeignTenantUsers
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["P:P"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("true",$P1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # MessageCreatedHasLink - A user sends a message containing a URL link in Teams
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\MessageCreatedHasLink.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\MessageCreatedHasLink.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\MessageCreatedHasLink.xlsx" -NoNumberConversion * -NoHyperLinkConversion * -FreezePane 2,9 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MessageCreatedHasLink" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:AO1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AO
+            $WorkSheet.Cells["A:AO"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("MessageCreatedHasLink",$H1)))' -BackgroundColor Red
+
+            # ConditionalFormatting - CommunicationType
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["O:O"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("OneOnOne",$O1)))' -BackgroundColor Red
+
+            # ConditionalFormatting - HasForeignTenantUsers
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["AH:AH"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("true",$AH1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # MessageSent - A new message was posted to a chat or a channel
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\MessageSent.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\MessageSent.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\MessageSent.xlsx" -NoNumberConversion * -FreezePane 2,9 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "MessageSent" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:AF1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-AF
+            $WorkSheet.Cells["A:AF"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("MessageSent",$H1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # SecurityRiskInCallDetected - A security risk was detected during an incoming call in Microsoft Teams, such as brand, domain, or user impersonation.
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\SecurityRiskInCallDetected.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\SecurityRiskInCallDetected.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            Write-Host "[Alert] Suspicious Operation(s) detected: SecurityRiskInCallDetected ($Count)" -ForegroundColor Red
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+        }
+    }
+
+    # TeamsImpersonationDetected - An external message sender is detected to have potential impersonation activity.
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\TeamsImpersonationDetected.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\TeamsImpersonationDetected.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            Write-Host "[Alert] Suspicious Operation(s) detected: TeamsImpersonationDetected ($Count)" -ForegroundColor Red
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\TeamsImpersonationDetected.xlsx" -FreezePane 2,7 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "TeamsImpersonationDetected" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:P1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-P
+            $WorkSheet.Cells["A:V"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("TeamsImpersonationDetected",$H1)))' -BackgroundColor Red
+
+            }
+        }
+    }
+
+    # UserAccepted - Accept a new message from a person who never established contact with.
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\UserAccepted.sql")
+    {
+        $Result = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\UserAccepted.sql" 2> $null
+        $Data = $Result | ConvertFrom-Csv
+        $Count  = ($Data | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams" -ItemType Directory -Force | Out-Null
+            $Data | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\UserAccepted.xlsx" -FreezePane 2,7 -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "UserAccepted" -CellStyleSB {
+            param($WorkSheet)
+            # BackgroundColor and FontColor for specific cells of TopRow
+            Set-Format -Address $WorkSheet.Cells["A1:Q1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+            # HorizontalAlignment "Center" of columns A-Q
+            $WorkSheet.Cells["A:Q"].Style.HorizontalAlignment="Center"
+
+            # ConditionalFormatting - Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["H:H"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("UserAccepted",$H1)))' -BackgroundColor Yellow
+
+            # ConditionalFormatting - ForeignTenantId
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["M:M"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("-",$M1)))' -BackgroundColor Yellow
+
+            # ConditionalFormatting - UserObjectId
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["N:N"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("-",$N1)))' -BackgroundColor Yellow
+
+            }
+        }
+    }
+
+    # Stats
+    Write-Output "[Info]  Creating Stats and Line Charts ..."
+    New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\Stats" -ItemType Directory -Force | Out-Null
+
+    # CommunicationType (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\Stats\CommunicationType.sql")
+    {
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\Stats\CommunicationType.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\Stats\CommunicationType.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "CommunicationType" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns A-C
+        $WorkSheet.Cells["A:C"].Style.HorizontalAlignment="Center"
+        }
+    }
+
+    # Operation (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\Stats\Operation.sql")
+    {
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\Stats\Operation.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\Stats\Operation.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Operations" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:C1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns B-C
+        $WorkSheet.Cells["B:C"].Style.HorizontalAlignment="Center"
+
+        # Iterating over the Operation-Blacklist HashTable
+        foreach ($Operation in $OperationBlacklist_HashTable.Keys) 
+        {
+            $Severity = $OperationBlacklist_HashTable["$Operation"]
+            $ConditionValue = 'EXACT("{0}",$A1)' -f $Operation
+            Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' -ConditionValue $ConditionValue -BackgroundColor $Severity
+        }
+
+        # ConditionalFormatting - Operation
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("ChatCreated",$A1)))' -BackgroundColor Yellow
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("MemberAdded",$A1)))' -BackgroundColor Yellow
+        Add-ConditionalFormatting -Address $WorkSheet.Cells["A:C"] -WorkSheet $WorkSheet -RuleType 'Expression' 'NOT(ISERROR(FIND("UserAccepted",$A1)))' -BackgroundColor Yellow
+
+        }
+    }
+
+    # ParticipatingDomains / ParticipatingTenantIds (Stats)
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\Stats\ParticipatingDomains-ParticipatingTenantIds.sql")
+    {
+        $Stats = & $DuckDB $Database -csv -nullvalue " " -f "$SCRIPT_DIR\Queries\MicrosoftTeams\Stats\ParticipatingDomains-ParticipatingTenantIds.sql" 2> $null
+        $Stats | ConvertFrom-Csv | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\Stats\ParticipatingDomains-ParticipatingTenantIds.xlsx" -NoNumberConversion * -FreezeTopRow -BoldTopRow -AutoSize -AutoFilter -WorkSheetname "Participants" -CellStyleSB {
+        param($WorkSheet)
+        # BackgroundColor and FontColor for specific cells of TopRow
+        Set-Format -Address $WorkSheet.Cells["A1:E1"] -BackgroundColor $BackgroundColor -FontColor $FontColor
+        # HorizontalAlignment "Center" of columns A-E
+        $WorkSheet.Cells["A:E"].Style.HorizontalAlignment="Center"
+        }
+    }
+
+    # Line Charts
+    New-Item "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\LineCharts" -ItemType Directory -Force | Out-Null
+
+    # Operations (Line Chart)
+    if (Test-Path "$SCRIPT_DIR\Queries\MicrosoftTeams\LineCharts\Operations.sql")
+    {
+        $Result = & $DuckDB $Database -csv -f "$SCRIPT_DIR\Queries\MicrosoftTeams\LineCharts\Operations.sql" 2> $null
+        $Import = $Result | ConvertFrom-Csv
+        $Count  = ($Import | Measure-Object).Count
+        if ($Count -gt 0)
+        {
+            $ChartDefinition = New-ExcelChartDefinition -XRange CreationTime -YRange Count -Title "Operations" -ChartType Line -NoLegend -Width 1200
+            $Import | Export-Excel -Path "$OUTPUT_FOLDER\UnifiedAuditLog\MicrosoftTeams\LineCharts\Operations.xlsx" -Append -WorksheetName "Line Chart" -AutoNameRange -ExcelChartDefinition $ChartDefinition
+        }
+    }
+
+    $EndTime_Teams = (Get-Date)
+    $Time_Teams = ($EndTime_Teams-$StartTime_Teams)
+    ('Microsoft Teams Processing duration:   {0} h {1} min {2} sec' -f $Time_Teams.Hours, $Time_Teams.Minutes, $Time_Teams.Seconds) >> "$OUTPUT_FOLDER\Stats.txt"
+}
+
+}
 
 #############################################################################################################################################################################################
 #############################################################################################################################################################################################
@@ -3131,6 +3499,7 @@ Get-Stats
 Invoke-GeoIPMapping
 Invoke-SuspiciousOperations
 Get-MailItemsAccessed
+Get-TeamsActivities
 #Export-Notebooks
 Start-DuckUI
 #Clear-IPInfoCache
@@ -3142,10 +3511,10 @@ Invoke-Footer
 #############################################################################################################################################################################################
 
 # SIG # Begin signature block
-# MIIrywYJKoZIhvcNAQcCoIIrvDCCK7gCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
+# MIIs3gYJKoZIhvcNAQcCoIIszzCCLMsCAQExCzAJBgUrDgMCGgUAMGkGCisGAQQB
 # gjcCAQSgWzBZMDQGCisGAQQBgjcCAR4wJgIDAQAABBAfzDtgWUsITrck0sYpfvNR
-# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQUR0tlplwh+TSZadcla6ghP04G
-# MdWggiUEMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
+# AgEAAgEAAgEAAgEAAgEAMCEwCQYFKw4DAhoFAAQU5u3QEDoMWSZoVGNqEI3G10U4
+# AzqggiYXMIIFbzCCBFegAwIBAgIQSPyTtGBVlI02p8mKidaUFjANBgkqhkiG9w0B
 # AQwFADB7MQswCQYDVQQGEwJHQjEbMBkGA1UECAwSR3JlYXRlciBNYW5jaGVzdGVy
 # MRAwDgYDVQQHDAdTYWxmb3JkMRowGAYDVQQKDBFDb21vZG8gQ0EgTGltaXRlZDEh
 # MB8GA1UEAwwYQUFBIENlcnRpZmljYXRlIFNlcnZpY2VzMB4XDTIxMDUyNTAwMDAw
@@ -3174,206 +3543,212 @@ Invoke-Footer
 # ZsBRNraJAlTH/Fj7bADu/pimLpWhDFMpH2/YGaZPnvesCepdgsaLr4CnvYFIUoQx
 # 2jLsFeSmTD1sOXPUC4U5IOCFGmjhp0g4qdE2JXfBjRkWxYhMZn0vY86Y6GnfrDyo
 # XZ3JHFuu2PMvdM+4fvbXg50RlmKarkUT2n/cR/vfw1Kf5gZV6Z2M8jpiUbzsJA8p
-# 1FiAhORFe1rYMIIGFDCCA/ygAwIBAgIQeiOu2lNplg+RyD5c9MfjPzANBgkqhkiG
-# 9w0BAQwFADBXMQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVk
-# MS4wLAYDVQQDEyVTZWN0aWdvIFB1YmxpYyBUaW1lIFN0YW1waW5nIFJvb3QgUjQ2
-# MB4XDTIxMDMyMjAwMDAwMFoXDTM2MDMyMTIzNTk1OVowVTELMAkGA1UEBhMCR0Ix
-# GDAWBgNVBAoTD1NlY3RpZ28gTGltaXRlZDEsMCoGA1UEAxMjU2VjdGlnbyBQdWJs
-# aWMgVGltZSBTdGFtcGluZyBDQSBSMzYwggGiMA0GCSqGSIb3DQEBAQUAA4IBjwAw
-# ggGKAoIBgQDNmNhDQatugivs9jN+JjTkiYzT7yISgFQ+7yavjA6Bg+OiIjPm/N/t
-# 3nC7wYUrUlY3mFyI32t2o6Ft3EtxJXCc5MmZQZ8AxCbh5c6WzeJDB9qkQVa46xiY
-# Epc81KnBkAWgsaXnLURoYZzksHIzzCNxtIXnb9njZholGw9djnjkTdAA83abEOHQ
-# 4ujOGIaBhPXG2NdV8TNgFWZ9BojlAvflxNMCOwkCnzlH4oCw5+4v1nssWeN1y4+R
-# laOywwRMUi54fr2vFsU5QPrgb6tSjvEUh1EC4M29YGy/SIYM8ZpHadmVjbi3Pl8h
-# JiTWw9jiCKv31pcAaeijS9fc6R7DgyyLIGflmdQMwrNRxCulVq8ZpysiSYNi79tw
-# 5RHWZUEhnRfs/hsp/fwkXsynu1jcsUX+HuG8FLa2BNheUPtOcgw+vHJcJ8HnJCrc
-# UWhdFczf8O+pDiyGhVYX+bDDP3GhGS7TmKmGnbZ9N+MpEhWmbiAVPbgkqykSkzyY
-# Vr15OApZYK8CAwEAAaOCAVwwggFYMB8GA1UdIwQYMBaAFPZ3at0//QET/xahbIIC
-# L9AKPRQlMB0GA1UdDgQWBBRfWO1MMXqiYUKNUoC6s2GXGaIymzAOBgNVHQ8BAf8E
-# BAMCAYYwEgYDVR0TAQH/BAgwBgEB/wIBADATBgNVHSUEDDAKBggrBgEFBQcDCDAR
-# BgNVHSAECjAIMAYGBFUdIAAwTAYDVR0fBEUwQzBBoD+gPYY7aHR0cDovL2NybC5z
-# ZWN0aWdvLmNvbS9TZWN0aWdvUHVibGljVGltZVN0YW1waW5nUm9vdFI0Ni5jcmww
-# fAYIKwYBBQUHAQEEcDBuMEcGCCsGAQUFBzAChjtodHRwOi8vY3J0LnNlY3RpZ28u
-# Y29tL1NlY3RpZ29QdWJsaWNUaW1lU3RhbXBpbmdSb290UjQ2LnA3YzAjBggrBgEF
-# BQcwAYYXaHR0cDovL29jc3Auc2VjdGlnby5jb20wDQYJKoZIhvcNAQEMBQADggIB
-# ABLXeyCtDjVYDJ6BHSVY/UwtZ3Svx2ImIfZVVGnGoUaGdltoX4hDskBMZx5NY5L6
-# SCcwDMZhHOmbyMhyOVJDwm1yrKYqGDHWzpwVkFJ+996jKKAXyIIaUf5JVKjccev3
-# w16mNIUlNTkpJEor7edVJZiRJVCAmWAaHcw9zP0hY3gj+fWp8MbOocI9Zn78xvm9
-# XKGBp6rEs9sEiq/pwzvg2/KjXE2yWUQIkms6+yslCRqNXPjEnBnxuUB1fm6bPAV+
-# Tsr/Qrd+mOCJemo06ldon4pJFbQd0TQVIMLv5koklInHvyaf6vATJP4DfPtKzSBP
-# kKlOtyaFTAjD2Nu+di5hErEVVaMqSVbfPzd6kNXOhYm23EWm6N2s2ZHCHVhlUgHa
-# C4ACMRCgXjYfQEDtYEK54dUwPJXV7icz0rgCzs9VI29DwsjVZFpO4ZIVR33LwXyP
-# DbYFkLqYmgHjR3tKVkhh9qKV2WCmBuC27pIOx6TYvyqiYbntinmpOqh/QPAnhDge
-# xKG9GX/n1PggkGi9HCapZp8fRwg8RftwS21Ln61euBG0yONM6noD2XQPrFwpm3Gc
-# uqJMf0o8LLrFkSLRQNwxPDDkWXhW+gZswbaiie5fd/W2ygcto78XCSPfFWveUOSZ
-# 5SqK95tBO8aTHmEa4lpJVD7HrTEn9jb1EGvxOb1cnn0CMIIGGjCCBAKgAwIBAgIQ
-# Yh1tDFIBnjuQeRUgiSEcCjANBgkqhkiG9w0BAQwFADBWMQswCQYDVQQGEwJHQjEY
-# MBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMS0wKwYDVQQDEyRTZWN0aWdvIFB1Ymxp
-# YyBDb2RlIFNpZ25pbmcgUm9vdCBSNDYwHhcNMjEwMzIyMDAwMDAwWhcNMzYwMzIx
-# MjM1OTU5WjBUMQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVk
-# MSswKQYDVQQDEyJTZWN0aWdvIFB1YmxpYyBDb2RlIFNpZ25pbmcgQ0EgUjM2MIIB
-# ojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAmyudU/o1P45gBkNqwM/1f/bI
-# U1MYyM7TbH78WAeVF3llMwsRHgBGRmxDeEDIArCS2VCoVk4Y/8j6stIkmYV5Gej4
-# NgNjVQ4BYoDjGMwdjioXan1hlaGFt4Wk9vT0k2oWJMJjL9G//N523hAm4jF4UjrW
-# 2pvv9+hdPX8tbbAfI3v0VdJiJPFy/7XwiunD7mBxNtecM6ytIdUlh08T2z7mJEXZ
-# D9OWcJkZk5wDuf2q52PN43jc4T9OkoXZ0arWZVeffvMr/iiIROSCzKoDmWABDRzV
-# /UiQ5vqsaeFaqQdzFf4ed8peNWh1OaZXnYvZQgWx/SXiJDRSAolRzZEZquE6cbcH
-# 747FHncs/Kzcn0Ccv2jrOW+LPmnOyB+tAfiWu01TPhCr9VrkxsHC5qFNxaThTG5j
-# 4/Kc+ODD2dX/fmBECELcvzUHf9shoFvrn35XGf2RPaNTO2uSZ6n9otv7jElspkfK
-# 9qEATHZcodp+R4q2OIypxR//YEb3fkDn3UayWW9bAgMBAAGjggFkMIIBYDAfBgNV
-# HSMEGDAWgBQy65Ka/zWWSC8oQEJwIDaRXBeF5jAdBgNVHQ4EFgQUDyrLIIcouOxv
-# SK4rVKYpqhekzQwwDgYDVR0PAQH/BAQDAgGGMBIGA1UdEwEB/wQIMAYBAf8CAQAw
-# EwYDVR0lBAwwCgYIKwYBBQUHAwMwGwYDVR0gBBQwEjAGBgRVHSAAMAgGBmeBDAEE
-# ATBLBgNVHR8ERDBCMECgPqA8hjpodHRwOi8vY3JsLnNlY3RpZ28uY29tL1NlY3Rp
-# Z29QdWJsaWNDb2RlU2lnbmluZ1Jvb3RSNDYuY3JsMHsGCCsGAQUFBwEBBG8wbTBG
-# BggrBgEFBQcwAoY6aHR0cDovL2NydC5zZWN0aWdvLmNvbS9TZWN0aWdvUHVibGlj
-# Q29kZVNpZ25pbmdSb290UjQ2LnA3YzAjBggrBgEFBQcwAYYXaHR0cDovL29jc3Au
-# c2VjdGlnby5jb20wDQYJKoZIhvcNAQEMBQADggIBAAb/guF3YzZue6EVIJsT/wT+
-# mHVEYcNWlXHRkT+FoetAQLHI1uBy/YXKZDk8+Y1LoNqHrp22AKMGxQtgCivnDHFy
-# AQ9GXTmlk7MjcgQbDCx6mn7yIawsppWkvfPkKaAQsiqaT9DnMWBHVNIabGqgQSGT
-# rQWo43MOfsPynhbz2Hyxf5XWKZpRvr3dMapandPfYgoZ8iDL2OR3sYztgJrbG6VZ
-# 9DoTXFm1g0Rf97Aaen1l4c+w3DC+IkwFkvjFV3jS49ZSc4lShKK6BrPTJYs4NG1D
-# GzmpToTnwoqZ8fAmi2XlZnuchC4NPSZaPATHvNIzt+z1PHo35D/f7j2pO1S8BCys
-# QDHCbM5Mnomnq5aYcKCsdbh0czchOm8bkinLrYrKpii+Tk7pwL7TjRKLXkomm5D1
-# Umds++pip8wH2cQpf93at3VDcOK4N7EwoIJB0kak6pSzEu4I64U6gZs7tS/dGNSl
-# jf2OSSnRr7KWzq03zl8l75jy+hOds9TWSenLbjBQUGR96cFr6lEUfAIEHVC1L68Y
-# 1GGxx4/eRI82ut83axHMViw1+sVpbPxg51Tbnio1lB93079WPFnYaOvfGAA0e0zc
-# fF/M9gXr+korwQTh2Prqooq2bYNMvUoUKD85gnJ+t0smrWrb8dee2CvYZXD5laGt
-# aAxOfy/VKNmwuWuAh9kcMIIGYjCCBMqgAwIBAgIRAKQpO24e3denNAiHrXpOtyQw
-# DQYJKoZIhvcNAQEMBQAwVTELMAkGA1UEBhMCR0IxGDAWBgNVBAoTD1NlY3RpZ28g
-# TGltaXRlZDEsMCoGA1UEAxMjU2VjdGlnbyBQdWJsaWMgVGltZSBTdGFtcGluZyBD
-# QSBSMzYwHhcNMjUwMzI3MDAwMDAwWhcNMzYwMzIxMjM1OTU5WjByMQswCQYDVQQG
-# EwJHQjEXMBUGA1UECBMOV2VzdCBZb3Jrc2hpcmUxGDAWBgNVBAoTD1NlY3RpZ28g
-# TGltaXRlZDEwMC4GA1UEAxMnU2VjdGlnbyBQdWJsaWMgVGltZSBTdGFtcGluZyBT
-# aWduZXIgUjM2MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA04SV9G6k
-# U3jyPRBLeBIHPNyUgVNnYayfsGOyYEXrn3+SkDYTLs1crcw/ol2swE1TzB2aR/5J
-# IjKNf75QBha2Ddj+4NEPKDxHEd4dEn7RTWMcTIfm492TW22I8LfH+A7Ehz0/safc
-# 6BbsNBzjHTt7FngNfhfJoYOrkugSaT8F0IzUh6VUwoHdYDpiln9dh0n0m545d5A5
-# tJD92iFAIbKHQWGbCQNYplqpAFasHBn77OqW37P9BhOASdmjp3IijYiFdcA0WQIe
-# 60vzvrk0HG+iVcwVZjz+t5OcXGTcxqOAzk1frDNZ1aw8nFhGEvG0ktJQknnJZE3D
-# 40GofV7O8WzgaAnZmoUn4PCpvH36vD4XaAF2CjiPsJWiY/j2xLsJuqx3JtuI4akH
-# 0MmGzlBUylhXvdNVXcjAuIEcEQKtOBR9lU4wXQpISrbOT8ux+96GzBq8TdbhoFcm
-# YaOBZKlwPP7pOp5Mzx/UMhyBA93PQhiCdPfIVOCINsUY4U23p4KJ3F1HqP3H6Slw
-# 3lHACnLilGETXRg5X/Fp8G8qlG5Y+M49ZEGUp2bneRLZoyHTyynHvFISpefhBCV0
-# KdRZHPcuSL5OAGWnBjAlRtHvsMBrI3AAA0Tu1oGvPa/4yeeiAyu+9y3SLC98gDVb
-# ySnXnkujjhIh+oaatsk/oyf5R2vcxHahajMCAwEAAaOCAY4wggGKMB8GA1UdIwQY
-# MBaAFF9Y7UwxeqJhQo1SgLqzYZcZojKbMB0GA1UdDgQWBBSIYYyhKjdkgShgoZsx
-# 0Iz9LALOTzAOBgNVHQ8BAf8EBAMCBsAwDAYDVR0TAQH/BAIwADAWBgNVHSUBAf8E
-# DDAKBggrBgEFBQcDCDBKBgNVHSAEQzBBMDUGDCsGAQQBsjEBAgEDCDAlMCMGCCsG
-# AQUFBwIBFhdodHRwczovL3NlY3RpZ28uY29tL0NQUzAIBgZngQwBBAIwSgYDVR0f
-# BEMwQTA/oD2gO4Y5aHR0cDovL2NybC5zZWN0aWdvLmNvbS9TZWN0aWdvUHVibGlj
-# VGltZVN0YW1waW5nQ0FSMzYuY3JsMHoGCCsGAQUFBwEBBG4wbDBFBggrBgEFBQcw
-# AoY5aHR0cDovL2NydC5zZWN0aWdvLmNvbS9TZWN0aWdvUHVibGljVGltZVN0YW1w
-# aW5nQ0FSMzYuY3J0MCMGCCsGAQUFBzABhhdodHRwOi8vb2NzcC5zZWN0aWdvLmNv
-# bTANBgkqhkiG9w0BAQwFAAOCAYEAAoE+pIZyUSH5ZakuPVKK4eWbzEsTRJOEjbIu
-# 6r7vmzXXLpJx4FyGmcqnFZoa1dzx3JrUCrdG5b//LfAxOGy9Ph9JtrYChJaVHrus
-# Dh9NgYwiGDOhyyJ2zRy3+kdqhwtUlLCdNjFjakTSE+hkC9F5ty1uxOoQ2ZkfI5WM
-# 4WXA3ZHcNHB4V42zi7Jk3ktEnkSdViVxM6rduXW0jmmiu71ZpBFZDh7Kdens+PQX
-# PgMqvzodgQJEkxaION5XRCoBxAwWwiMm2thPDuZTzWp/gUFzi7izCmEt4pE3Kf0M
-# Ot3ccgwn4Kl2FIcQaV55nkjv1gODcHcD9+ZVjYZoyKTVWb4VqMQy/j8Q3aaYd/jO
-# Q66Fhk3NWbg2tYl5jhQCuIsE55Vg4N0DUbEWvXJxtxQQaVR5xzhEI+BjJKzh3TQ0
-# 26JxHhr2fuJ0mV68AluFr9qshgwS5SpN5FFtaSEnAwqZv3IS+mlG50rK7W3qXbWw
-# i4hmpylUfygtYLEdLQukNEX1jiOKMIIGazCCBNOgAwIBAgIRAIxBnpO/K86siAYo
-# O3YZvTwwDQYJKoZIhvcNAQEMBQAwVDELMAkGA1UEBhMCR0IxGDAWBgNVBAoTD1Nl
-# Y3RpZ28gTGltaXRlZDErMCkGA1UEAxMiU2VjdGlnbyBQdWJsaWMgQ29kZSBTaWdu
-# aW5nIENBIFIzNjAeFw0yNDExMTQwMDAwMDBaFw0yNzExMTQyMzU5NTlaMFcxCzAJ
-# BgNVBAYTAkRFMRYwFAYDVQQIDA1OaWVkZXJzYWNoc2VuMRcwFQYDVQQKDA5NYXJ0
-# aW4gV2lsbGluZzEXMBUGA1UEAwwOTWFydGluIFdpbGxpbmcwggIiMA0GCSqGSIb3
-# DQEBAQUAA4ICDwAwggIKAoICAQDRn27mnIzB6dsJFLMexQQNRd8aMv73DTla68G6
-# Q8u+V2TY1JQ/Z4j2oCI9ATW3K3P7NAPdlE0QmtdjC0F/74jsfil/i8LwxuyT034w
-# abViZKUcodmKsEFhM9am8W5kUgLuC5FIK4wNOq5TfzYdHTyJu1eR2XuSDoMp0wg4
-# 5mOuFNBbYB8DVBtHxobvWq4eCs3lUxX07wR3Qr2Utb92w8eU2vKr2Ss9xIh/YvM4
-# UxgBpO1I6O+W2tAB5mmynIgoCfX7mu6iD3A+AhpQ9Gv209G83y8FPrFJIWU77TTe
-# hErbPjZ074xXwrlEkhnGUCk1w+KiNtZHaSn0X+vnhqJ7otBxQZQAESlhWXpDKCun
-# nnVnVgwvVWtccAhxZO95eif6Vss/UhCaBZ26szlneGtFeTClI4+k3mqfWuodtXjH
-# c8ohAclWp7XVywliwhCFEsAcFkpkCyivey0sqEfrwiMnRy1elH1S37XcQaav5+bt
-# 4KxtIXuOVEx3vM9MHdlraW0y1on5E8i4tagdI45TH0LU080ubc2MKqq6ZXtplTu1
-# wdF2Cgy3hfSSLkJscRWApvpvOO6Vtc4jTG/AO6iqN5M6Swd+g40XtsxBD/gSk9kM
-# qkgJ1pD1Gp5gkHnP1veut+YgJ9xWcRDJI7vcis9qsXwtVybeOCh56rTQvC/Tf6BJ
-# tiieEQIDAQABo4IBszCCAa8wHwYDVR0jBBgwFoAUDyrLIIcouOxvSK4rVKYpqhek
-# zQwwHQYDVR0OBBYEFIxyZAmEHl7uAfEwbB4nzI8MCCLbMA4GA1UdDwEB/wQEAwIH
-# gDAMBgNVHRMBAf8EAjAAMBMGA1UdJQQMMAoGCCsGAQUFBwMDMEoGA1UdIARDMEEw
-# NQYMKwYBBAGyMQECAQMCMCUwIwYIKwYBBQUHAgEWF2h0dHBzOi8vc2VjdGlnby5j
-# b20vQ1BTMAgGBmeBDAEEATBJBgNVHR8EQjBAMD6gPKA6hjhodHRwOi8vY3JsLnNl
-# Y3RpZ28uY29tL1NlY3RpZ29QdWJsaWNDb2RlU2lnbmluZ0NBUjM2LmNybDB5Bggr
-# BgEFBQcBAQRtMGswRAYIKwYBBQUHMAKGOGh0dHA6Ly9jcnQuc2VjdGlnby5jb20v
-# U2VjdGlnb1B1YmxpY0NvZGVTaWduaW5nQ0FSMzYuY3J0MCMGCCsGAQUFBzABhhdo
-# dHRwOi8vb2NzcC5zZWN0aWdvLmNvbTAoBgNVHREEITAfgR1td2lsbGluZ0BsZXRo
-# YWwtZm9yZW5zaWNzLmNvbTANBgkqhkiG9w0BAQwFAAOCAYEAZ0dBMMwluWGb+MD1
-# rGWaPtaXrNZnlZqOZxgbdrMLBKAQr0QGcILCVIZ4SZYaevT5yMR6jFGSAjgaFtnk
-# 8ZpbtGwig/ed/C/D1Ne8SZyffdtALns/5CHxMnU8ks7ut7dsR6zFD4/bmljuoUoi
-# 55W6/XU/1pr+tqRaZGJvjSKJQCN9MhFAvXSpPPqRsj27ze1+KYIBF1/L0BW0HS0d
-# 9ZhGSUoEwqMDLpQf2eqJFyyyzWt21VVhLF6mgZ1dE5tCLZY7ERzx6/h5N7F0w361
-# oigizMbCMdST29XOc5mB8q6Cye7OmEfM2jByRWa+cd4RycsN2p2wHRukpq48iX+t
-# PVKmHwNKf+upuKPDQAeV4J7gUCtevIsOtoyiC2+amimu81o424Dl+NsAyCLz0SXv
-# NAhVvtU73H61gtoPa/SWouem2S+bzp7oGvGPop/9mh4CXki6LVeDH3hDM8hZsJg/
-# EToIWiDozTc2yWqwV4Ozyd4x5Ix8lckXMgWuyWcxmLK1RmKpMIIGgjCCBGqgAwIB
-# AgIQNsKwvXwbOuejs902y8l1aDANBgkqhkiG9w0BAQwFADCBiDELMAkGA1UEBhMC
-# VVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNVBAcTC0plcnNleSBDaXR5MR4w
-# HAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsxLjAsBgNVBAMTJVVTRVJUcnVz
-# dCBSU0EgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkwHhcNMjEwMzIyMDAwMDAwWhcN
-# MzgwMTE4MjM1OTU5WjBXMQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBM
-# aW1pdGVkMS4wLAYDVQQDEyVTZWN0aWdvIFB1YmxpYyBUaW1lIFN0YW1waW5nIFJv
-# b3QgUjQ2MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAiJ3YuUVnnR3d
-# 6LkmgZpUVMB8SQWbzFoVD9mUEES0QUCBdxSZqdTkdizICFNeINCSJS+lV1ipnW5i
-# hkQyC0cRLWXUJzodqpnMRs46npiJPHrfLBOifjfhpdXJ2aHHsPHggGsCi7uE0awq
-# KggE/LkYw3sqaBia67h/3awoqNvGqiFRJ+OTWYmUCO2GAXsePHi+/JUNAax3kpqs
-# tbl3vcTdOGhtKShvZIvjwulRH87rbukNyHGWX5tNK/WABKf+Gnoi4cmisS7oSimg
-# HUI0Wn/4elNd40BFdSZ1EwpuddZ+Wr7+Dfo0lcHflm/FDDrOJ3rWqauUP8hsokDo
-# I7D/yUVI9DAE/WK3Jl3C4LKwIpn1mNzMyptRwsXKrop06m7NUNHdlTDEMovXAIDG
-# AvYynPt5lutv8lZeI5w3MOlCybAZDpK3Dy1MKo+6aEtE9vtiTMzz/o2dYfdP0KWZ
-# wZIXbYsTIlg1YIetCpi5s14qiXOpRsKqFKqav9R1R5vj3NgevsAsvxsAnI8Oa5s2
-# oy25qhsoBIGo/zi6GpxFj+mOdh35Xn91y72J4RGOJEoqzEIbW3q0b2iPuWLA911c
-# RxgY5SJYubvjay3nSMbBPPFsyl6mY4/WYucmyS9lo3l7jk27MAe145GWxK4O3m3g
-# EFEIkv7kRmefDR7Oe2T1HxAnICQvr9sCAwEAAaOCARYwggESMB8GA1UdIwQYMBaA
-# FFN5v1qqK0rPVIDh2JvAnfKyA2bLMB0GA1UdDgQWBBT2d2rdP/0BE/8WoWyCAi/Q
-# Cj0UJTAOBgNVHQ8BAf8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zATBgNVHSUEDDAK
-# BggrBgEFBQcDCDARBgNVHSAECjAIMAYGBFUdIAAwUAYDVR0fBEkwRzBFoEOgQYY/
-# aHR0cDovL2NybC51c2VydHJ1c3QuY29tL1VTRVJUcnVzdFJTQUNlcnRpZmljYXRp
-# b25BdXRob3JpdHkuY3JsMDUGCCsGAQUFBwEBBCkwJzAlBggrBgEFBQcwAYYZaHR0
-# cDovL29jc3AudXNlcnRydXN0LmNvbTANBgkqhkiG9w0BAQwFAAOCAgEADr5lQe1o
-# RLjlocXUEYfktzsljOt+2sgXke3Y8UPEooU5y39rAARaAdAxUeiX1ktLJ3+lgxto
-# LQhn5cFb3GF2SSZRX8ptQ6IvuD3wz/LNHKpQ5nX8hjsDLRhsyeIiJsms9yAWnvdY
-# OdEMq1W61KE9JlBkB20XBee6JaXx4UBErc+YuoSb1SxVf7nkNtUjPfcxuFtrQdRM
-# Ri/fInV/AobE8Gw/8yBMQKKaHt5eia8ybT8Y/Ffa6HAJyz9gvEOcF1VWXG8OMeM7
-# Vy7Bs6mSIkYeYtddU1ux1dQLbEGur18ut97wgGwDiGinCwKPyFO7ApcmVJOtlw9F
-# VJxw/mL1TbyBns4zOgkaXFnnfzg4qbSvnrwyj1NiurMp4pmAWjR+Pb/SIduPnmFz
-# bSN/G8reZCL4fvGlvPFk4Uab/JVCSmj59+/mB2Gn6G/UYOy8k60mKcmaAZsEVkhO
-# Fuoj4we8CYyaR9vd9PGZKSinaZIkvVjbH/3nlLb0a7SBIkiRzfPfS9T+JesylbHa
-# 1LtRV9U/7m0q7Ma2CQ/t392ioOssXW7oKLdOmMBl14suVFBmbzrt5V5cQPnwtd3U
-# OTpS9oCG+ZZheiIvPgkDmA8FzPsnfXW5qHELB43ET7HHFHeRPRYrMBKjkb8/IN7P
-# o0d0hQoF4TeMM+zYAJzoKQnVKOLg8pZVPT8xggYxMIIGLQIBATBpMFQxCzAJBgNV
-# BAYTAkdCMRgwFgYDVQQKEw9TZWN0aWdvIExpbWl0ZWQxKzApBgNVBAMTIlNlY3Rp
-# Z28gUHVibGljIENvZGUgU2lnbmluZyBDQSBSMzYCEQCMQZ6TvyvOrIgGKDt2Gb08
-# MAkGBSsOAwIaBQCgeDAYBgorBgEEAYI3AgEMMQowCKACgAChAoAAMBkGCSqGSIb3
-# DQEJAzEMBgorBgEEAYI3AgEEMBwGCisGAQQBgjcCAQsxDjAMBgorBgEEAYI3AgEV
-# MCMGCSqGSIb3DQEJBDEWBBTBhztBcFTbZ7E/DCSkxqMyXbT06TANBgkqhkiG9w0B
-# AQEFAASCAgAmQFciDhvHA9dzHbYvbUWOF+oWC1R+zwBfd5OOW3OxJKdnfA3uhIp2
-# JzK9PpaKm1GO6qthRi1lz2MY3W8lNOwTZh5FhzYYAba4RnE5qAQhKlwUhf3Rb1qu
-# O4X6GTAJMHuVNiaD3bU86hlhwgEHfeGWUjU2sU6G+qsltE3WKwkc+je3bmVT0fiH
-# HgQxmvw5jJBUvwRqA2wVR9X/RzkfwVipAbTdO7N3Ss8PCbAY+lhkafDQcT/Q9jMc
-# FL5/2aCxodWH3uN8MM/HtPQAAffxGzO6pIIa3wNVyykKQ4um5lSN/hPn3vnwg3K9
-# HTxTWuHmk9R4Sz1vnbi9NLkRgucppx70FniRfgpTXE85PxNksscJfILt+aUFSdyZ
-# Oxf51imU61hV0CRz4gOMHwsfALfE7SiOhKOfzKJHpRm+pKIrZWQcQsk5hlnaqzsr
-# 2X/0TH1EUkbXW9mY+CD9fb8TCNz+phANikkC4xjRIoEB2yl+UYPKH/PMZriqfucA
-# UhhzdvjaYO0UtVYhENQaY7J90EKbrHpRbtUoolPpsl7k1a3XSjdOu0tZNeubo1U4
-# fRCFUHzJSt1xyFmC1Ss6xxFfa+JkReuHPDHD6KnjKepodcAxYRN/c/RNyLiaOheD
-# 2bZDHpA2+807lWuTriFO2sIgMdTmS6Ok7BURMKoMQFCHYCzi/g5sSqGCAyMwggMf
-# BgkqhkiG9w0BCQYxggMQMIIDDAIBATBqMFUxCzAJBgNVBAYTAkdCMRgwFgYDVQQK
-# Ew9TZWN0aWdvIExpbWl0ZWQxLDAqBgNVBAMTI1NlY3RpZ28gUHVibGljIFRpbWUg
-# U3RhbXBpbmcgQ0EgUjM2AhEApCk7bh7d16c0CIetek63JDANBglghkgBZQMEAgIF
-# AKB5MBgGCSqGSIb3DQEJAzELBgkqhkiG9w0BBwEwHAYJKoZIhvcNAQkFMQ8XDTI2
-# MDYwMTA0NTg0NVowPwYJKoZIhvcNAQkEMTIEMGXyxf1My0XGFi/ooUBCBhIDJ0Bn
-# jtRU8IZ9KoYjCfMWAvyJcU8HYkfx9m3po9EKRTANBgkqhkiG9w0BAQEFAASCAgDN
-# N7xcEbGva/T8hvW27If4Wgeg40jzw3KxLGprABYXrzp1n7PRdjsyTlg+5TZWgxjy
-# YechiolvG9x2Z4d3SW2JKJspOonGOx743Dt2w/myc2KhW6RQ54xbIqpXD72hbclk
-# nRl2RDVgL/3taXA0kQL7Lxi/pTta19Thx1I9CKW2PbEhNDkH/3pmVC+w2x0rvZx5
-# x1n877qjQ0e+Xl2HZr6HnE69SWqnq6il2oKDwdBFrCq0TTCeeZjlE9TxjAQVhrS7
-# TGWiA6q/rbpd/yEDlnSfZwyhejN3lCpkNTpO3RBagp02LJsldKZA/wsF2OQju9jM
-# FDy/wd6Ohx+VIrz8M4WIMDD1L4UTi30jQICyhgvOSFOU/7q/ImylD6X9JuDKK44T
-# 5l1LwLHn58fRjeSftqyI5oJI8vP38vGMYqIVpAurjCVTxrinsHnHle2akYPJBjUK
-# pZznNXG/dWEyHM19Sj4tl2PZzRJv4cXyXvGnOQwFvqESAPCs768orup1842DcOk4
-# dVsV3efL3AQ8RZQZASiUnu340cr49Emzot7W68SN5gO6WqqWiQlAjZEApBFiw43e
-# 0k85288/TgYGFDdCG4pOkPLgeLoGSlD42kYPG9Q7XN9x4fyd3GH+3JZ0SPsRPMNo
-# 8plFYtB40f8FXWlkFC33nEqCtxkTQiInDK7SXOZwsg==
+# 1FiAhORFe1rYMIIGGjCCBAKgAwIBAgIQYh1tDFIBnjuQeRUgiSEcCjANBgkqhkiG
+# 9w0BAQwFADBWMQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVk
+# MS0wKwYDVQQDEyRTZWN0aWdvIFB1YmxpYyBDb2RlIFNpZ25pbmcgUm9vdCBSNDYw
+# HhcNMjEwMzIyMDAwMDAwWhcNMzYwMzIxMjM1OTU5WjBUMQswCQYDVQQGEwJHQjEY
+# MBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMSswKQYDVQQDEyJTZWN0aWdvIFB1Ymxp
+# YyBDb2RlIFNpZ25pbmcgQ0EgUjM2MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIB
+# igKCAYEAmyudU/o1P45gBkNqwM/1f/bIU1MYyM7TbH78WAeVF3llMwsRHgBGRmxD
+# eEDIArCS2VCoVk4Y/8j6stIkmYV5Gej4NgNjVQ4BYoDjGMwdjioXan1hlaGFt4Wk
+# 9vT0k2oWJMJjL9G//N523hAm4jF4UjrW2pvv9+hdPX8tbbAfI3v0VdJiJPFy/7Xw
+# iunD7mBxNtecM6ytIdUlh08T2z7mJEXZD9OWcJkZk5wDuf2q52PN43jc4T9OkoXZ
+# 0arWZVeffvMr/iiIROSCzKoDmWABDRzV/UiQ5vqsaeFaqQdzFf4ed8peNWh1OaZX
+# nYvZQgWx/SXiJDRSAolRzZEZquE6cbcH747FHncs/Kzcn0Ccv2jrOW+LPmnOyB+t
+# AfiWu01TPhCr9VrkxsHC5qFNxaThTG5j4/Kc+ODD2dX/fmBECELcvzUHf9shoFvr
+# n35XGf2RPaNTO2uSZ6n9otv7jElspkfK9qEATHZcodp+R4q2OIypxR//YEb3fkDn
+# 3UayWW9bAgMBAAGjggFkMIIBYDAfBgNVHSMEGDAWgBQy65Ka/zWWSC8oQEJwIDaR
+# XBeF5jAdBgNVHQ4EFgQUDyrLIIcouOxvSK4rVKYpqhekzQwwDgYDVR0PAQH/BAQD
+# AgGGMBIGA1UdEwEB/wQIMAYBAf8CAQAwEwYDVR0lBAwwCgYIKwYBBQUHAwMwGwYD
+# VR0gBBQwEjAGBgRVHSAAMAgGBmeBDAEEATBLBgNVHR8ERDBCMECgPqA8hjpodHRw
+# Oi8vY3JsLnNlY3RpZ28uY29tL1NlY3RpZ29QdWJsaWNDb2RlU2lnbmluZ1Jvb3RS
+# NDYuY3JsMHsGCCsGAQUFBwEBBG8wbTBGBggrBgEFBQcwAoY6aHR0cDovL2NydC5z
+# ZWN0aWdvLmNvbS9TZWN0aWdvUHVibGljQ29kZVNpZ25pbmdSb290UjQ2LnA3YzAj
+# BggrBgEFBQcwAYYXaHR0cDovL29jc3Auc2VjdGlnby5jb20wDQYJKoZIhvcNAQEM
+# BQADggIBAAb/guF3YzZue6EVIJsT/wT+mHVEYcNWlXHRkT+FoetAQLHI1uBy/YXK
+# ZDk8+Y1LoNqHrp22AKMGxQtgCivnDHFyAQ9GXTmlk7MjcgQbDCx6mn7yIawsppWk
+# vfPkKaAQsiqaT9DnMWBHVNIabGqgQSGTrQWo43MOfsPynhbz2Hyxf5XWKZpRvr3d
+# MapandPfYgoZ8iDL2OR3sYztgJrbG6VZ9DoTXFm1g0Rf97Aaen1l4c+w3DC+IkwF
+# kvjFV3jS49ZSc4lShKK6BrPTJYs4NG1DGzmpToTnwoqZ8fAmi2XlZnuchC4NPSZa
+# PATHvNIzt+z1PHo35D/f7j2pO1S8BCysQDHCbM5Mnomnq5aYcKCsdbh0czchOm8b
+# kinLrYrKpii+Tk7pwL7TjRKLXkomm5D1Umds++pip8wH2cQpf93at3VDcOK4N7Ew
+# oIJB0kak6pSzEu4I64U6gZs7tS/dGNSljf2OSSnRr7KWzq03zl8l75jy+hOds9TW
+# SenLbjBQUGR96cFr6lEUfAIEHVC1L68Y1GGxx4/eRI82ut83axHMViw1+sVpbPxg
+# 51Tbnio1lB93079WPFnYaOvfGAA0e0zcfF/M9gXr+korwQTh2Prqooq2bYNMvUoU
+# KD85gnJ+t0smrWrb8dee2CvYZXD5laGtaAxOfy/VKNmwuWuAh9kcMIIGazCCBNOg
+# AwIBAgIRAIxBnpO/K86siAYoO3YZvTwwDQYJKoZIhvcNAQEMBQAwVDELMAkGA1UE
+# BhMCR0IxGDAWBgNVBAoTD1NlY3RpZ28gTGltaXRlZDErMCkGA1UEAxMiU2VjdGln
+# byBQdWJsaWMgQ29kZSBTaWduaW5nIENBIFIzNjAeFw0yNDExMTQwMDAwMDBaFw0y
+# NzExMTQyMzU5NTlaMFcxCzAJBgNVBAYTAkRFMRYwFAYDVQQIDA1OaWVkZXJzYWNo
+# c2VuMRcwFQYDVQQKDA5NYXJ0aW4gV2lsbGluZzEXMBUGA1UEAwwOTWFydGluIFdp
+# bGxpbmcwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQDRn27mnIzB6dsJ
+# FLMexQQNRd8aMv73DTla68G6Q8u+V2TY1JQ/Z4j2oCI9ATW3K3P7NAPdlE0Qmtdj
+# C0F/74jsfil/i8LwxuyT034wabViZKUcodmKsEFhM9am8W5kUgLuC5FIK4wNOq5T
+# fzYdHTyJu1eR2XuSDoMp0wg45mOuFNBbYB8DVBtHxobvWq4eCs3lUxX07wR3Qr2U
+# tb92w8eU2vKr2Ss9xIh/YvM4UxgBpO1I6O+W2tAB5mmynIgoCfX7mu6iD3A+AhpQ
+# 9Gv209G83y8FPrFJIWU77TTehErbPjZ074xXwrlEkhnGUCk1w+KiNtZHaSn0X+vn
+# hqJ7otBxQZQAESlhWXpDKCunnnVnVgwvVWtccAhxZO95eif6Vss/UhCaBZ26szln
+# eGtFeTClI4+k3mqfWuodtXjHc8ohAclWp7XVywliwhCFEsAcFkpkCyivey0sqEfr
+# wiMnRy1elH1S37XcQaav5+bt4KxtIXuOVEx3vM9MHdlraW0y1on5E8i4tagdI45T
+# H0LU080ubc2MKqq6ZXtplTu1wdF2Cgy3hfSSLkJscRWApvpvOO6Vtc4jTG/AO6iq
+# N5M6Swd+g40XtsxBD/gSk9kMqkgJ1pD1Gp5gkHnP1veut+YgJ9xWcRDJI7vcis9q
+# sXwtVybeOCh56rTQvC/Tf6BJtiieEQIDAQABo4IBszCCAa8wHwYDVR0jBBgwFoAU
+# DyrLIIcouOxvSK4rVKYpqhekzQwwHQYDVR0OBBYEFIxyZAmEHl7uAfEwbB4nzI8M
+# CCLbMA4GA1UdDwEB/wQEAwIHgDAMBgNVHRMBAf8EAjAAMBMGA1UdJQQMMAoGCCsG
+# AQUFBwMDMEoGA1UdIARDMEEwNQYMKwYBBAGyMQECAQMCMCUwIwYIKwYBBQUHAgEW
+# F2h0dHBzOi8vc2VjdGlnby5jb20vQ1BTMAgGBmeBDAEEATBJBgNVHR8EQjBAMD6g
+# PKA6hjhodHRwOi8vY3JsLnNlY3RpZ28uY29tL1NlY3RpZ29QdWJsaWNDb2RlU2ln
+# bmluZ0NBUjM2LmNybDB5BggrBgEFBQcBAQRtMGswRAYIKwYBBQUHMAKGOGh0dHA6
+# Ly9jcnQuc2VjdGlnby5jb20vU2VjdGlnb1B1YmxpY0NvZGVTaWduaW5nQ0FSMzYu
+# Y3J0MCMGCCsGAQUFBzABhhdodHRwOi8vb2NzcC5zZWN0aWdvLmNvbTAoBgNVHREE
+# ITAfgR1td2lsbGluZ0BsZXRoYWwtZm9yZW5zaWNzLmNvbTANBgkqhkiG9w0BAQwF
+# AAOCAYEAZ0dBMMwluWGb+MD1rGWaPtaXrNZnlZqOZxgbdrMLBKAQr0QGcILCVIZ4
+# SZYaevT5yMR6jFGSAjgaFtnk8ZpbtGwig/ed/C/D1Ne8SZyffdtALns/5CHxMnU8
+# ks7ut7dsR6zFD4/bmljuoUoi55W6/XU/1pr+tqRaZGJvjSKJQCN9MhFAvXSpPPqR
+# sj27ze1+KYIBF1/L0BW0HS0d9ZhGSUoEwqMDLpQf2eqJFyyyzWt21VVhLF6mgZ1d
+# E5tCLZY7ERzx6/h5N7F0w361oigizMbCMdST29XOc5mB8q6Cye7OmEfM2jByRWa+
+# cd4RycsN2p2wHRukpq48iX+tPVKmHwNKf+upuKPDQAeV4J7gUCtevIsOtoyiC2+a
+# mimu81o424Dl+NsAyCLz0SXvNAhVvtU73H61gtoPa/SWouem2S+bzp7oGvGPop/9
+# mh4CXki6LVeDH3hDM8hZsJg/EToIWiDozTc2yWqwV4Ozyd4x5Ix8lckXMgWuyWcx
+# mLK1RmKpMIIGgjCCBGqgAwIBAgIQNsKwvXwbOuejs902y8l1aDANBgkqhkiG9w0B
+# AQwFADCBiDELMAkGA1UEBhMCVVMxEzARBgNVBAgTCk5ldyBKZXJzZXkxFDASBgNV
+# BAcTC0plcnNleSBDaXR5MR4wHAYDVQQKExVUaGUgVVNFUlRSVVNUIE5ldHdvcmsx
+# LjAsBgNVBAMTJVVTRVJUcnVzdCBSU0EgQ2VydGlmaWNhdGlvbiBBdXRob3JpdHkw
+# HhcNMjEwMzIyMDAwMDAwWhcNMzgwMTE4MjM1OTU5WjBXMQswCQYDVQQGEwJHQjEY
+# MBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMS4wLAYDVQQDEyVTZWN0aWdvIFB1Ymxp
+# YyBUaW1lIFN0YW1waW5nIFJvb3QgUjQ2MIICIjANBgkqhkiG9w0BAQEFAAOCAg8A
+# MIICCgKCAgEAiJ3YuUVnnR3d6LkmgZpUVMB8SQWbzFoVD9mUEES0QUCBdxSZqdTk
+# dizICFNeINCSJS+lV1ipnW5ihkQyC0cRLWXUJzodqpnMRs46npiJPHrfLBOifjfh
+# pdXJ2aHHsPHggGsCi7uE0awqKggE/LkYw3sqaBia67h/3awoqNvGqiFRJ+OTWYmU
+# CO2GAXsePHi+/JUNAax3kpqstbl3vcTdOGhtKShvZIvjwulRH87rbukNyHGWX5tN
+# K/WABKf+Gnoi4cmisS7oSimgHUI0Wn/4elNd40BFdSZ1EwpuddZ+Wr7+Dfo0lcHf
+# lm/FDDrOJ3rWqauUP8hsokDoI7D/yUVI9DAE/WK3Jl3C4LKwIpn1mNzMyptRwsXK
+# rop06m7NUNHdlTDEMovXAIDGAvYynPt5lutv8lZeI5w3MOlCybAZDpK3Dy1MKo+6
+# aEtE9vtiTMzz/o2dYfdP0KWZwZIXbYsTIlg1YIetCpi5s14qiXOpRsKqFKqav9R1
+# R5vj3NgevsAsvxsAnI8Oa5s2oy25qhsoBIGo/zi6GpxFj+mOdh35Xn91y72J4RGO
+# JEoqzEIbW3q0b2iPuWLA911cRxgY5SJYubvjay3nSMbBPPFsyl6mY4/WYucmyS9l
+# o3l7jk27MAe145GWxK4O3m3gEFEIkv7kRmefDR7Oe2T1HxAnICQvr9sCAwEAAaOC
+# ARYwggESMB8GA1UdIwQYMBaAFFN5v1qqK0rPVIDh2JvAnfKyA2bLMB0GA1UdDgQW
+# BBT2d2rdP/0BE/8WoWyCAi/QCj0UJTAOBgNVHQ8BAf8EBAMCAYYwDwYDVR0TAQH/
+# BAUwAwEB/zATBgNVHSUEDDAKBggrBgEFBQcDCDARBgNVHSAECjAIMAYGBFUdIAAw
+# UAYDVR0fBEkwRzBFoEOgQYY/aHR0cDovL2NybC51c2VydHJ1c3QuY29tL1VTRVJU
+# cnVzdFJTQUNlcnRpZmljYXRpb25BdXRob3JpdHkuY3JsMDUGCCsGAQUFBwEBBCkw
+# JzAlBggrBgEFBQcwAYYZaHR0cDovL29jc3AudXNlcnRydXN0LmNvbTANBgkqhkiG
+# 9w0BAQwFAAOCAgEADr5lQe1oRLjlocXUEYfktzsljOt+2sgXke3Y8UPEooU5y39r
+# AARaAdAxUeiX1ktLJ3+lgxtoLQhn5cFb3GF2SSZRX8ptQ6IvuD3wz/LNHKpQ5nX8
+# hjsDLRhsyeIiJsms9yAWnvdYOdEMq1W61KE9JlBkB20XBee6JaXx4UBErc+YuoSb
+# 1SxVf7nkNtUjPfcxuFtrQdRMRi/fInV/AobE8Gw/8yBMQKKaHt5eia8ybT8Y/Ffa
+# 6HAJyz9gvEOcF1VWXG8OMeM7Vy7Bs6mSIkYeYtddU1ux1dQLbEGur18ut97wgGwD
+# iGinCwKPyFO7ApcmVJOtlw9FVJxw/mL1TbyBns4zOgkaXFnnfzg4qbSvnrwyj1Ni
+# urMp4pmAWjR+Pb/SIduPnmFzbSN/G8reZCL4fvGlvPFk4Uab/JVCSmj59+/mB2Gn
+# 6G/UYOy8k60mKcmaAZsEVkhOFuoj4we8CYyaR9vd9PGZKSinaZIkvVjbH/3nlLb0
+# a7SBIkiRzfPfS9T+JesylbHa1LtRV9U/7m0q7Ma2CQ/t392ioOssXW7oKLdOmMBl
+# 14suVFBmbzrt5V5cQPnwtd3UOTpS9oCG+ZZheiIvPgkDmA8FzPsnfXW5qHELB43E
+# T7HHFHeRPRYrMBKjkb8/IN7Po0d0hQoF4TeMM+zYAJzoKQnVKOLg8pZVPT8wggan
+# MIIEj6ADAgECAhEAkKwIciD9xafEa1zHDfc9BjANBgkqhkiG9w0BAQwFADBXMQsw
+# CQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMS4wLAYDVQQDEyVT
+# ZWN0aWdvIFB1YmxpYyBUaW1lIFN0YW1waW5nIFJvb3QgUjQ2MB4XDTI2MDMyNTAw
+# MDAwMFoXDTQxMDMyNDIzNTk1OVowVTELMAkGA1UEBhMCR0IxGDAWBgNVBAoTD1Nl
+# Y3RpZ28gTGltaXRlZDEsMCoGA1UEAxMjU2VjdGlnbyBQdWJsaWMgVGltZSBTdGFt
+# cGluZyBDQSBSNDEwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoICAQCu5Eqi
+# Aa2CHGL5Zi1bmgPM8NUXwYZJ+BtQqHps43GLTC+sjVLypsBh+8uv+TLkgtVGD//v
+# SmA0qrzELf9YRCh2MTAA/aGaQZKGg0BRCmziR3pbCnvgWjtGXBDUyn3j3K2lZAO8
+# KxgFtlxwOYEAkL+CCqK4v9zzTl8ZwzDpPMiDIFa5THk8an1ieF5I09cXNrPQw+1E
+# R1liThaG0z6FrOpqwxZWmPRZQBw2E32878UB1bL0Zp91vuWZgsMpNNiPCoBj0/1F
+# +LE8+NRokfqacFI0F2tftrRB2W7HQClLR9zjxFbWb5be2rceIfNyHUUfKGIvMI2N
+# zoxSlxXnFqUG887D8W1Cj8DFok688JKxWvHR/9aQykSbd+9Vutj36ij2sgq/125w
+# TpUZ/AgC0ph50bRs7gFrUyaXE9wSsOqMvCCC+sEm7vd/BemSG0TSHNXSmyCba+FC
+# zekeWX03TRIcF3Laqd0Rw24OH7jpei4zaGhcI7nfdhBA4c8RScxNY6jeHLHHmSMM
+# Tk9Wqn7H4dLhUBP5YEwbgbN4uv1i9ltTnHli8t1xHV0StX9BFgrnmunTX19kUXY1
+# H5ORJbRZyZDdvm1oZyteDj0SnMozr+YSmdIleDUTXdfoY7b2taz8s2+QbOxLxcah
+# EIYGWzqu6h955tKwcANHcZ4gTmAhT3btuOiQsQIDAQABo4IBbjCCAWowHwYDVR0j
+# BBgwFoAU9ndq3T/9ARP/FqFsggIv0Ao9FCUwHQYDVR0OBBYEFDp0pQxnxkJQwv21
+# /Me7KTSC9Hq5MA4GA1UdDwEB/wQEAwIBhjASBgNVHRMBAf8ECDAGAQH/AgEAMBMG
+# A1UdJQQMMAoGCCsGAQUFBwMIMCMGA1UdIAQcMBowCAYGZ4EMAQQCMA4GDCsGAQQB
+# sjEBAgEDCDBMBgNVHR8ERTBDMEGgP6A9hjtodHRwOi8vY3JsLnNlY3RpZ28uY29t
+# L1NlY3RpZ29QdWJsaWNUaW1lU3RhbXBpbmdSb290UjQ2LmNybDB8BggrBgEFBQcB
+# AQRwMG4wRwYIKwYBBQUHMAKGO2h0dHA6Ly9jcnQuc2VjdGlnby5jb20vU2VjdGln
+# b1B1YmxpY1RpbWVTdGFtcGluZ1Jvb3RSNDYucDdjMCMGCCsGAQUFBzABhhdodHRw
+# Oi8vb2NzcC5zZWN0aWdvLmNvbTANBgkqhkiG9w0BAQwFAAOCAgEAMt5SR2bxngNm
+# +N8oc6Gq76Gx1c235fkX7jw8Ho9MAkJGADerHE7dhsBXttqmzgr/7ZZahZSykGRP
+# hPY1crj028kB8KzO0dKC2qQBAwtfgqMLKkkX/6bYq2uT33eD6ByAp2/XKD0LcmZh
+# 0kKecvSBr6ln9ajX6u1dnx2fA7xEKy1M3qBhfQSUWLtjs2nFt0ELVLptzTlX9ID0
+# cL+iOPfdboZ3CelT+JXKVKR2Sge0d4YiFAtPZkfSo8z1Z1x7y/Z9mwMIlBAnyuWX
+# s4YsNuxdrYIt/QxE31PDOJ9DesS4Bc7H9OTORlEV/AvfiF/VepKZpira1MzLYuCw
+# +uoLZn/pkpvd+CvNTS+mEHjBJNa6WK1j8qXFu+jIq+sG9QILHiyB6p/xpHrkJu8z
+# kw393+VqF9eKlTY2VjRxdycZLrVemZ4Yp3wi33b+W58CllH3HqjmowlZ7SOrgmx8
+# YwYOkgrHsXOQHyBp6O4FRb8In0+FzjT7ElGie9V7CfhL3IlVFZ4zjuKsZtH1iU3f
+# Gu4z/JnOGT6sCb0BbTqe/uhvpFCQBdH5xPGIA/LrbQUXjU2tWJgHhTIqnN/HvHyO
+# Hi5tM4zP3nhgh2rJ6Kqq2xsHBeNYs/R18xQ8DeIg+c90Eoaeh0YlN1KU8AyYol3K
+# 9M+qY5ez8syd/7ZlrRnoVewgH3P1pcswggbiMIIEyqADAgECAhEA507yVbBQT/rb
+# pt/3/IujFTANBgkqhkiG9w0BAQwFADBVMQswCQYDVQQGEwJHQjEYMBYGA1UEChMP
+# U2VjdGlnbyBMaW1pdGVkMSwwKgYDVQQDEyNTZWN0aWdvIFB1YmxpYyBUaW1lIFN0
+# YW1waW5nIENBIFI0MTAeFw0yNjAzMjUwMDAwMDBaFw0zNzA2MjQyMzU5NTlaMHIx
+# CzAJBgNVBAYTAkdCMRcwFQYDVQQIEw5HcmVhdGVyIExvbmRvbjEYMBYGA1UEChMP
+# U2VjdGlnbyBMaW1pdGVkMTAwLgYDVQQDEydTZWN0aWdvIFB1YmxpYyBUaW1lIFN0
+# YW1waW5nIFNpZ25lciBSMzcwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIKAoIC
+# AQCy/8NtS9xQ2UUtBRF32bj7VK3n4m50Uqjk/zTciSziYV40H1LKah0/oEklYG42
+# E4VCP3DvsBUB6DmpCkDZ0jCnZBPIEevaH15ZJOQwFWP2ZXr5YjlJpb68Nlbs+ElN
+# vKx32/1YHde3qqUSLybjulxPLz6T85+HOIqK7M1Bep8LspyhEP/q6nw5kGxTSrGv
+# ufmeH+JF8CnVBcVMFA40FlIYh0cDJVFhhfTfdWgLy/vWuLMQoKkf3s/FvByf16r0
+# rtbyHm/iemwxSioJL9zyZDDKUNAbHXl0dhXo2VxUV2NcPXWXuoKsjL+6cfk6Vm2D
+# HnxAlFdFsaBDIF1JOkSnC6PeLlBznZn2buF3vIIYJcq6N/zeFRCk4/HXDz7zgRsR
+# RMdUB+rhyk5FoZaBjw0nLq3GZ3fClLUx5es5pUAxzNODMBn7JkFYip2BAGBPER5e
+# V0ROhk6tGTG+fUiMiV+vgjg1YnP5FvnYWyEtWeQD/B2hp3vz0RvtdkM0p3igyadz
+# rfpOBq5ppVk/YsuhTQkP99ivneHAGfi5e7lmxJ+meoBPrRLuzMmb81rzzbESjJHM
+# sn5RVtc6Ucs7rcMqQC13PUIO7BbGBETV2ufCmV6lPTp3P7XJOvmnUCRTPbVvMTpx
+# P/z+SOHg4/OCBhiqs4FA9+4oQvlkk9w32NGASli9GWrm5wIDAQABo4IBjjCCAYow
+# HwYDVR0jBBgwFoAUOnSlDGfGQlDC/bX8x7spNIL0erkwHQYDVR0OBBYEFGEQ6XoS
+# r1HEhdTyz6R0D1DNIK/4MA4GA1UdDwEB/wQEAwIGwDAMBgNVHRMBAf8EAjAAMBYG
+# A1UdJQEB/wQMMAoGCCsGAQUFBwMIMEoGA1UdIARDMEEwCAYGZ4EMAQQCMDUGDCsG
+# AQQBsjEBAgEDCDAlMCMGCCsGAQUFBwIBFhdodHRwczovL3NlY3RpZ28uY29tL0NQ
+# UzBKBgNVHR8EQzBBMD+gPaA7hjlodHRwOi8vY3JsLnNlY3RpZ28uY29tL1NlY3Rp
+# Z29QdWJsaWNUaW1lU3RhbXBpbmdDQVI0MS5jcmwwegYIKwYBBQUHAQEEbjBsMEUG
+# CCsGAQUFBzAChjlodHRwOi8vY3J0LnNlY3RpZ28uY29tL1NlY3RpZ29QdWJsaWNU
+# aW1lU3RhbXBpbmdDQVI0MS5jcnQwIwYIKwYBBQUHMAGGF2h0dHA6Ly9vY3NwLnNl
+# Y3RpZ28uY29tMA0GCSqGSIb3DQEBDAUAA4ICAQAD6j2N0azN+hl6k6bKB5/U6VuS
+# Os93ZBb3Pczy9VtBIKu4947Z5GwL0aFngIxl+GSuLFrJgPruBCRvKJEJsm7kv+LQ
+# 1COVCEG9tZ+IRtr4ocUoa53lgdFaENlS0N4wgkZkbQEPv+x+1lSjYh+T4JeL9mUz
+# nT7Erc6Sp5dWLka5sMP/m3GZi6oJPdPcsCKWagH7m2H2xDGIyHJC5PdH9phvi/Km
+# hkktiSVTNNqVeV5bWdX2zhRE6UTfz0IcMoCL996lFIydXxOCE4MNDHDM0as4lnTi
+# T/KHMccO6l8c9TnUVgmpci9ar1IABZ2U1XUkYjGGSn9MC3EHDP9V39VuBVvZ33/B
+# EV/EWSRrf07T7jFplKX+gQr/UOqPGMlE7ZJ72UaUkNJy7bVl3bcLKzdpjIHzLkf/
+# 4MVa1V7w8wqCv5W4gOnRGTlud5UMARbRM8BPxR/CXYXoMmIOD8pmTk2axgRL4LG8
+# XtuchISdCHRmtacAmLGq5XSYSVTHTXADlO48iDKh3HM2r98LSF6f0sG12d8V9Jn7
+# C3wDUieOxuKj4MdWrW+hiJU2kF87v6eH00HgCFFc2V0+CvfOCMn7juzS41jLaINc
+# BlKWQ/fKb/uDLfWOW73z1I2lFY7Xj8tQ1XYtK5eREjWItM8jpl1cbQOc88btR+0X
+# S2TmboE/141+va2PWzGCBjEwggYtAgEBMGkwVDELMAkGA1UEBhMCR0IxGDAWBgNV
+# BAoTD1NlY3RpZ28gTGltaXRlZDErMCkGA1UEAxMiU2VjdGlnbyBQdWJsaWMgQ29k
+# ZSBTaWduaW5nIENBIFIzNgIRAIxBnpO/K86siAYoO3YZvTwwCQYFKw4DAhoFAKB4
+# MBgGCisGAQQBgjcCAQwxCjAIoAKAAKECgAAwGQYJKoZIhvcNAQkDMQwGCisGAQQB
+# gjcCAQQwHAYKKwYBBAGCNwIBCzEOMAwGCisGAQQBgjcCARUwIwYJKoZIhvcNAQkE
+# MRYEFPXCqpnJ+qE9/2jZvje4xFQBSkKbMA0GCSqGSIb3DQEBAQUABIICAJIcrv/e
+# WpjakIsYkwMHr9Wbpc8x7jB/FhP7easxzFLsMlgFU4rDO7DNaq/llGwEtkuXEMcD
+# IHRIh7Y0EWyV3oOxiPWc14KhL/tsOQpoaWCyM3pvuf0o4jTxs+g60xQ2GIpuXZaS
+# BqUwphAbGYRwRGJOJGskeoWSH1glVqqKtkjpqYYLZ8nAgg8yK5JDaVzE7fLyZOyD
+# yWxRh+2MEONK+BIOjDOaxcv97EuPbR1gS3iTfuGBF4ST3mjd3hbyYkopkCHxTsux
+# aNlYdqq1FtpzhlX1MpPNyu1f1Ypq2D2+OkyjqdyEQE5YaFUU5Dv5K8yC+x3Cw2PC
+# 9vYiTQel8LmUbql57QmY3sZe5wwgnjpa1e75g/qrmnM4Ijibp9MDTtNY9k3VEuIW
+# IVk+nvsDsKv0wKOF+XG24T5v40odqC3zoDHcKp1QqlF4sgLY7eBpUbgZw0ZZ9ank
+# 9wxZEP2u14Sz7ba42gxt4/J41SwGBAH18IoWzGvHvXbfitBbVa2lMk7FzUocbbcX
+# 8XKPGxOy45WSmdUn5AKyw4otpsT4ONLVHzjRNENOcefW5OX97f/Z423IarSDsCyV
+# irlhWymbHFZJ2ioWtLJ/0edylbI73FUuiZ2SSNkGyEeOi1EA16oCg7+RusIKoDw8
+# QvKGE9Zznw2VlrkNk0rkc8dGQzHL3iPH97CuoYIDIzCCAx8GCSqGSIb3DQEJBjGC
+# AxAwggMMAgEBMGowVTELMAkGA1UEBhMCR0IxGDAWBgNVBAoTD1NlY3RpZ28gTGlt
+# aXRlZDEsMCoGA1UEAxMjU2VjdGlnbyBQdWJsaWMgVGltZSBTdGFtcGluZyBDQSBS
+# NDECEQDnTvJVsFBP+tum3/f8i6MVMA0GCWCGSAFlAwQCAgUAoHkwGAYJKoZIhvcN
+# AQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMjYwNzA2MTEzMTI3WjA/
+# BgkqhkiG9w0BCQQxMgQwWvH1c8e+LCuZre60ADet0LfqyXP6uTxpKb6gjxscmSQW
+# ST8j2NRNA17/tLFqEacJMA0GCSqGSIb3DQEBAQUABIICAJc6mPr5NI3JRPSEzd05
+# qp1hztJkN1MeMMkFJNT0J2SVPW3BXRssl56DRAVLUHWbowKn84xyg/n0aURP7KdD
+# VPCNxKv1Q+Dy9T2Q7is6XL5S0NH33nDEwTNxuZSnGXLvKK1ugYCj/ElyyPz4ekHr
+# i43HrGhfCc6wS+kg1f1Q28syVvSxrKhNHfrBxABXxBZ/Yh/nt/UVmvyraqiqhNLr
+# iEDoZB0dFJh2OvFVPIny3FHhNY7fxLN94gqSATDrSg/NGwJlG6xx1dCoiVMGezrB
+# 6yuVGgXJlYnpKz0L9CZc3t1D4MDCkDtbHHVFD96twkQTL03YhNLdC2+2edWadA/C
+# dtLw/ZWymUmvQ/t5Rg2l3nPovdp3XpOV9QNE97qkxeAd0nDpdmg5sQhUsIrL+tKC
+# +E9RXRxQMWECIIoyroqN2GcwNsV2lKWSSiA59Vx3aKXcwtb5EWnco2GGG39Q1z33
+# 2nc9A6albb2pRRqPy2vosDWy/Ts4CVqzvtmP/AJAfVD5Chtn9LYKyRAGfS8lwNh2
+# n7xUj50MWahXC3PVTne0DYYXNb92REIgT3O7ArCm9FlHvKP4fJcpgZXXptKuo/B1
+# PZrjTC52e0XILnebYyLrsRHVGl/SznMuGNqHUljxf+R9/FAlxTWheVzamCyeLv6v
+# iwtkUuIsjzDX0sDL4cCcLkM2
 # SIG # End signature block

@@ -2,7 +2,7 @@
 -- Description: Creates a view and breakdown of UserLoginFailed events to analyze authentication failures
 -- Id: 9f07206b-1cca-4fdb-a566-1ce963a4062b
 -- Author: Martin Willing
--- Date: 2026-05-15
+-- Date: 2026-06-14
 INSTALL inet;
 LOAD inet;
 WITH ResultSet AS (
@@ -94,4 +94,4 @@ SELECT
     Id
 FROM ResultSet
 LEFT JOIN IPinfo_Lite
-  ON IPAddress::INET <<= IPinfo_Lite.cidr;
+  ON TRY_CAST(IPAddress AS INET) <<= IPinfo_Lite.cidr;

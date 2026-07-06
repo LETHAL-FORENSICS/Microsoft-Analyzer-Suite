@@ -2,7 +2,7 @@
 -- Description: Creates a view and breakdown of MailItemsAccessed events to trace email access
 -- Id: 837c47a6-d886-4e32-94a4-d8b1cdae8345
 -- Author: Martin Willing
--- Date: 2026-05-30
+-- Date: 2026-06-14
 INSTALL inet;
 LOAD inet;
 WITH ResultSet AS (
@@ -119,5 +119,5 @@ SELECT
   Id
 FROM 'ResultSet'
 LEFT JOIN IPinfo_Lite
-  ON IPAddress::INET <<= IPinfo_Lite.cidr
+  ON TRY_CAST(IPAddress AS INET) <<= IPinfo_Lite.cidr
 ORDER BY CreationTime DESC;

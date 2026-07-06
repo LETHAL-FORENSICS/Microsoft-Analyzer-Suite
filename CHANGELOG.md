@@ -2,6 +2,17 @@
 
 All changes to the Microsoft-Analyzer-Suite will be documented in this file.  
 
+## [1.9.0] - 2026-07-06
+### Added
+- OAuthPermissions-Analyzer: OAuthSentry Feed (OAuth Application Intelligence)
+- OAuthPermissions-Analyzer: AppRegistrations.csv
+- OAuthPermissions-Analyzer: ServicePrincipals.csv
+- OAuthPermissions-Analyzer: Microsoft Entra Connect Sync (ConnectSyncProvisioning_)
+- UALGraph-Analyzer: Microsoft Teams Support (15 DuckDB Queries)
+
+### Fixed
+- Minor fixes and improvements
+
 ## [1.8.0] - 2026-06-01
 ### Added
 - UALGraph-Analyzer

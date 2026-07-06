@@ -2,7 +2,7 @@
 -- Description: Creates a view and breakdown of UserLoggedIn events to analyze successful authentication
 -- Id: 565aad85-c254-4b4a-b711-ccac0463e173
 -- Author: Martin Willing
--- Date: 2026-05-17
+-- Date: 2026-06-14
 INSTALL inet;
 LOAD inet;
 WITH ResultSet AS (
@@ -94,4 +94,4 @@ SELECT
   Id
 FROM ResultSet
 LEFT JOIN IPinfo_Lite
-  ON IPAddress::INET <<= IPinfo_Lite.cidr;
+  ON TRY_CAST(IPAddress AS INET) <<= IPinfo_Lite.cidr;
