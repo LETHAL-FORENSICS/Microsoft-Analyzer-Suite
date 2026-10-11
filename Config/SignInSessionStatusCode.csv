@@ -1,0 +1,8 @@
+"SignInSessionStatusCode","Description"
+"1002","Unbound: No Microsoft Entra ID device state (device not registered)."
+"1003","Unbound: Device state doesn't meet token protection requirements (unsupported registration type or legacy registration)."
+"1004","Unbound: Device registration isn't hardware-backed."
+"1005","Unbound: Unspecified reason."
+"1006","Unbound: OS version isn't supported."
+"1007","Unbound: Not hardware-backed and signed-in user isn't the registered device owner."
+"1008","Unbound: Client isn't integrated with the platform broker (e.g. WAM) or broker app isn't installed."
