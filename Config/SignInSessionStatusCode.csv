@@ -1,4 +1,5 @@
 "SignInSessionStatusCode","Description"
+"0","Bound: Token is bound to the device (observed for bound sign-ins; not listed in Microsoft's documentation)."
 "1002","Unbound: No Microsoft Entra ID device state (device not registered)."
 "1003","Unbound: Device state doesn't meet token protection requirements (unsupported registration type or legacy registration)."
 "1004","Unbound: Device registration isn't hardware-backed."
