@@ -24,6 +24,7 @@
 "PowerShell/5.1","Offensive Tool","Yellow"
 "PowerShell/7","Offensive Tool","Yellow"
 "python-requests","Offensive Tool","Yellow"
+"Python-urllib/","Password Spraying Attack, BEC","Red"
 "python/","Offensive Tool","Yellow"
 "Python/","Offensive Tool","Yellow"
 "sharphound/","Offensive Tool","Red"
